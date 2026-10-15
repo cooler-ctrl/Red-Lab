@@ -73,7 +73,29 @@
 
 ---
 
-## Installation & Setup
+## Desktop Software (macOS & Windows)
+
+RedLab is available as a standalone, downloadable desktop software with zero external setup required:
+- **macOS:** Downloadable `.dmg` disk image and `.zip` archive (Universal Apple Silicon & Intel).
+- **Windows PC:** Graphical installer (`RedLab Setup 1.0.0.exe`) and portable executable (`RedLab 1.0.0.exe`).
+
+For full download instructions, Gatekeeper/SmartScreen guidance, and build scripts, consult the [Desktop Installation Guide](docs/DESKTOP_INSTALLATION.md).
+
+### Packaging Commands:
+```bash
+# macOS Build (generates desktop/dist/RedLab-1.0.0.dmg)
+chmod +x scripts/package-mac.sh
+./scripts/package-mac.sh
+
+# Windows Build (generates desktop/dist/RedLab Setup 1.0.0.exe)
+scripts\build-windows.bat     # Command Prompt
+.\scripts\build-windows.ps1   # PowerShell
+```
+Releases are also automatically built and published via GitHub Actions (`.github/workflows/build-desktop.yml`).
+
+---
+
+## Installation & Setup (Web / Local Development)
 
 ### 1. Clone the Repository
 ```bash

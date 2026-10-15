@@ -1,0 +1,146 @@
+name: Build Desktop Applications (macOS & Windows)
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    name: Build macOS DMG & ZIP
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Python dependencies & PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pyinstaller pillow
+
+      - name: Generate Application Icons
+        run: python scripts/generate_icons.py
+
+      - name: Build React Frontend
+        run: |
+          cd frontend
+          npm ci || npm install
+          npm run build
+
+      - name: Compile Backend with PyInstaller
+        run: |
+          cd backend
+          python -m PyInstaller redlab-backend.spec --noconfirm
+
+      - name: Stage Backend for Desktop
+        run: |
+          mkdir -p desktop/dist-backend
+          cp -R backend/dist/redlab-backend desktop/dist-backend/redlab-backend
+
+      - name: Package macOS App & DMG
+        run: |
+          cd desktop
+          npm ci || npm install
+          npm run build:mac
+
+      - name: Upload macOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: RedLab-macOS
+          path: |
+            desktop/dist/*.dmg
+            desktop/dist/*.zip
+
+  build-windows:
+    name: Build Windows EXE Installer & Portable
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Python dependencies & PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pyinstaller pillow
+
+      - name: Generate Application Icons
+        run: python scripts/generate_icons.py
+
+      - name: Build React Frontend
+        run: |
+          cd frontend
+          npm ci || npm install
+          npm run build
+
+      - name: Compile Backend with PyInstaller
+        run: |
+          cd backend
+          python -m PyInstaller redlab-backend.spec --noconfirm
+
+      - name: Stage Backend for Desktop
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path desktop/dist-backend
+          Copy-Item -Recurse -Force backend/dist/redlab-backend desktop/dist-backend/redlab-backend
+
+      - name: Package Windows Installer & Portable
+        run: |
+          cd desktop
+          npm ci || npm install
+          npm run build:win
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: RedLab-Windows
+          path: |
+            desktop/dist/*.exe
+
+  release:
+    name: Publish GitHub Release
+    needs: [build-macos, build-windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            RedLab-macOS/*.dmg
+            RedLab-macOS/*.zip
+            RedLab-Windows/*.exe
+          draft: false
+          prerelease: false
+          generate_release_notes: true

@@ -17,6 +17,15 @@ backend/redlab.db-journal
 *.sqlite
 *.db
 
+# PyInstaller & Desktop Builds
+backend/build/
+backend/dist/
+desktop/node_modules/
+desktop/dist/
+desktop/dist-backend/
+*.spec
+!backend/redlab-backend.spec
+
 # Environment & IDE
 .env
 .env.local
@@ -25,3 +34,4 @@ backend/redlab.db-journal
 *.swo
 .vscode/
 .idea/
+
