@@ -1,0 +1,27 @@
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.tsbuildinfo
+
+# Python / Backend
+backend/__pycache__/
+backend/*/__pycache__/
+backend/*/*/__pycache__/
+backend/*/*/*/__pycache__/
+backend/*.pyc
+backend/*/*.pyc
+backend/.pytest_cache/
+backend/redlab.db
+backend/redlab.db-journal
+*.sqlite
+*.db
+
+# Environment & IDE
+.env
+.env.local
+.DS_Store
+*.swp
+*.swo
+.vscode/
+.idea/
