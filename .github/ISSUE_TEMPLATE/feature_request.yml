@@ -1,0 +1,69 @@
+name: Feature Request
+description: Propose a new feature, cloud resource type, or capability for RedLab
+title: "feat: <concise feature title>"
+labels: ["type:feature", "status:backlog"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### RedLab Feature Request Form
+        Thank you for suggesting an enhancement to RedLab. Please provide comprehensive details to help our engineering team review and plan your request.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement & Motivation
+      description: What challenge or user limitation does this feature resolve?
+      placeholder: "e.g., As a cloud security student, I cannot currently model AWS Lambda serverless functions..."
+    validations:
+      required: true
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed Solution & Scope
+      description: Describe the expected behavior, interactions, and component boundaries.
+      placeholder: "Add a Lambda node to the palette with configuration options for IAM role, VPC attachment, and runtime..."
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Architectural Subsystem
+      description: Which area of the codebase does this primarily impact?
+      options:
+        - "area:frontend (Canvas, UI, Inspector)"
+        - "area:backend (API, Persistence)"
+        - "area:security (Rules Engine, Attack Paths)"
+        - "area:simulation (Runtime Environments)"
+        - "area:devops (CI/CD, Docker)"
+        - "area:documentation"
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: Relative urgency of this enhancement
+      options:
+        - "priority:P0 (Critical / Blocker)"
+        - "priority:P1 (High)"
+        - "priority:P2 (Medium)"
+        - "priority:P3 (Low)"
+    validations:
+      required: true
+  - type: textarea
+    id: security_considerations
+    attributes:
+      label: Security & Isolation Considerations
+      description: Note any potential security implications, input validation, or sandbox boundaries.
+      placeholder: "Ensure configurations are validated via Pydantic; does not make real cloud network calls."
+    validations:
+      required: false
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      options:
+        - label: I have verified this feature does not duplicate an existing capability.
+          required: true
+        - label: This request adheres to the local educational simulation model (no paid external cloud APIs).
+          required: true

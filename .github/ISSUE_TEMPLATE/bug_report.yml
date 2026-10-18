@@ -1,0 +1,66 @@
+name: Bug Report
+description: Report an issue, crash, or unexpected behavior in RedLab
+title: "fix: <concise bug description>"
+labels: ["type:bug", "status:backlog"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### RedLab Defect / Bug Report
+        Thank you for reporting an issue! Please provide steps to reliably reproduce the behavior.
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: Clear and concise description of the defect.
+      placeholder: "When connecting a Security Group to an RDS instance, the canvas drops the connection..."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Exact steps to reproduce the behavior.
+      placeholder: |
+        1. Start application with 'npm run dev' and 'uvicorn app.main:app'
+        2. Drag RDS node onto canvas
+        3. Attempt to connect Security Group node to RDS node
+        4. See error in console
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should have happened?
+      placeholder: "Connection edge is accepted and RDS config security_group_ids array updates."
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs & Diagnostic Information
+      description: Paste terminal logs, browser console errors, or error tracebacks.
+      render: shell
+    validations:
+      required: false
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: Impact on normal development or usage
+      options:
+        - "priority:P0 (App crash, test suite blocked)"
+        - "priority:P1 (Core workflow impaired)"
+        - "priority:P2 (Minor functional defect with workaround)"
+        - "priority:P3 (Cosmetic / styling glitch)"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment Info
+      description: OS version, browser, Python version, Node version
+      placeholder: "macOS 15.0 / Chrome 128 / Python 3.14 / Node 20.12"
+    validations:
+      required: false

@@ -1,0 +1,113 @@
+name: Engineering Task
+description: Track an actionable engineering work package within RedLab
+title: "[RL-xxx]: <concise task title>"
+labels: ["type:task", "status:backlog"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### RedLab Engineering Task Specification
+        Each engineering task must be actionable, assignable to a domain role, and accompanied by measurable acceptance criteria.
+  - type: input
+    id: task_id
+    attributes:
+      label: Task ID
+      description: The canonical ID from project-management/TASKS.md (e.g., RL-014)
+      placeholder: "RL-xxx"
+    validations:
+      required: true
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: Milestone
+      description: Target milestone from ROADMAP.md
+      options:
+        - "M1: Architecture and Foundation"
+        - "M2: Frontend and User Experience"
+        - "M3: Backend and Database"
+        - "M4: Simulation Engine"
+        - "M5: Custom Script Execution"
+        - "M6: DevOps and Infrastructure"
+        - "M7: Testing and Security"
+        - "M8: Documentation and MVP Release"
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: Relative urgency and blocking nature
+      options:
+        - "priority:P0 (Blocker)"
+        - "priority:P1 (High)"
+        - "priority:P2 (Medium)"
+        - "priority:P3 (Low)"
+    validations:
+      required: true
+  - type: dropdown
+    id: responsible_role
+    attributes:
+      label: Suggested Responsible Role
+      description: Domain engineer responsible for implementation per TEAM_WORKFLOW.md
+      options:
+        - "Lead (Architecture & Release Reviews)"
+        - "Dev 1 (Visual Canvas & Graph Engine)"
+        - "Dev 2 (Inspector, UI & Dashboard)"
+        - "Dev 3 (Security Engine & Sandboxes)"
+        - "Dev 4 (Backend API & Persistence)"
+        - "Dev 5 (QA, Testing & DevSecOps)"
+    validations:
+      required: true
+  - type: input
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: List prerequisite task IDs if any (comma-separated)
+      placeholder: "e.g., RL-004, RL-010 (or None)"
+    validations:
+      required: false
+  - type: textarea
+    id: description
+    attributes:
+      label: Description & Technical Scope
+      description: Detailed explanation of implementation requirements and architecture.
+      placeholder: "Explain what needs to be implemented and key files impacted..."
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria (Testable Statements)
+      description: Checklist of exact measurable criteria required for completion.
+      value: |
+        - [ ] Criterion 1: 
+        - [ ] Criterion 2: 
+        - [ ] Criterion 3: 
+    validations:
+      required: true
+  - type: textarea
+    id: verification_instructions
+    attributes:
+      label: Verification Instructions
+      description: Concrete commands to verify this task locally.
+      placeholder: "cd backend && python3 -m pytest tests/test_feature.py -v"
+    validations:
+      required: true
+  - type: textarea
+    id: required_evidence
+    attributes:
+      label: Required Evidence
+      description: What artifacts must be attached to the pull request?
+      value: |
+        - [ ] Automated test suite output attached
+        - [ ] Screenshot or UI demonstration (if frontend)
+        - [ ] Zero secrets verified
+    validations:
+      required: true
+  - type: textarea
+    id: security_considerations
+    attributes:
+      label: Security Considerations
+      description: Note any implications for sandbox boundaries, input validation, or credentials.
+    validations:
+      required: false

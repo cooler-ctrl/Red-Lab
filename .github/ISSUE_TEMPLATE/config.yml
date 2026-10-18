@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: RedLab Architecture & Design Documentation
+    url: https://github.com/cooler-ctrl/Red-Lab/blob/develop/docs/architecture.md
+    about: Review RedLab system architecture and component breakdown.
+  - name: Team Workflow & Git Branching Guide
+    url: https://github.com/cooler-ctrl/Red-Lab/blob/develop/TEAM_WORKFLOW.md
+    about: Read domain ownership rules and branching strategies.

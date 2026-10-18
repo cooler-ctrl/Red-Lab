@@ -1,0 +1,66 @@
+name: Security-Sensitive Engineering Task
+description: Track security-critical tasks involving isolation, sandbox execution, or hardening
+title: "[RL-SEC-xxx]: <security task title>"
+labels: ["area:security", "type:security", "priority:P0", "status:backlog"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### RedLab Security-Sensitive Task Specification
+        **CRITICAL:** Tasks modifying isolation boundaries, script execution sandboxes, container capabilities, or network filters require dual review (Author + Security Reviewer + Lead Architect).
+  - type: input
+    id: task_id
+    attributes:
+      label: Task ID
+      description: The canonical ID from project-management/TASKS.md (e.g., RL-021, RL-024)
+      placeholder: "RL-02x"
+    validations:
+      required: true
+  - type: dropdown
+    id: security_domain
+    attributes:
+      label: Security Domain
+      options:
+        - "Script Sandbox Isolation (gVisor, cgroups, namespaces)"
+        - "Network Egress Filtering & IMDS Metadata Lockdown"
+        - "Deterministic Rule Correctness & Scoring"
+        - "Authentication, Session Tokens & RBAC"
+        - "Input Sanitization & Injection Prevention"
+        - "Dependency & Container Vulnerability (CVE) Mitigation"
+    validations:
+      required: true
+  - type: textarea
+    id: threat_model
+    attributes:
+      label: Threat Model & Attack Vector
+      description: What threat actor behavior or bypass mechanism does this address?
+      placeholder: "e.g. Preventing arbitrary scripts from accessing 169.254.169.254 to steal AWS credentials."
+    validations:
+      required: true
+  - type: textarea
+    id: technical_controls
+    attributes:
+      label: Implemented Technical Controls
+      description: Detail exact security flags, seccomp filters, iptables rules, or permission drops.
+      placeholder: "--cap-drop=ALL, --read-only, --security-opt=no-new-privileges, unprivileged UID 65534"
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Security Acceptance Criteria (Testable Statements)
+      value: |
+        - [ ] Host isolation preserved: script cannot escape container filesystem.
+        - [ ] Network lockdown verified: connections to loopback and IMDS drop deterministically.
+        - [ ] Hard timeout enforced: runaway processes terminate within 10s watchdog limit.
+        - [ ] Dual peer review conducted prior to merge.
+    validations:
+      required: true
+  - type: textarea
+    id: adversarial_testing
+    attributes:
+      label: Adversarial Penetration Testing Plan
+      description: How will you actively test this defense against hostile bypass attempts?
+      placeholder: "Run automated test attempting to curl 169.254.169.254 and assert connection drop."
+    validations:
+      required: true
