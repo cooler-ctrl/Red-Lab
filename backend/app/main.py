@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .core.config import settings
 from .core.database import init_db
 from .api.labs import router as labs_router
+from .api.runs import router as runs_router
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -23,6 +24,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(labs_router)
+app.include_router(runs_router)
 
 # Mount built frontend SPA if available
 if settings.FRONTEND_DIST and (settings.FRONTEND_DIST / "index.html").exists():
@@ -48,4 +50,3 @@ if settings.FRONTEND_DIST and (settings.FRONTEND_DIST / "index.html").exists():
 @app.on_event("startup")
 def on_startup():
     init_db()
-

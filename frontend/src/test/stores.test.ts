@@ -104,13 +104,13 @@ describe('EditorStore', () => {
 
   it('adds and selects nodes correctly', () => {
     const node = {
-      id: 's3-test',
+      id: 'fw-test',
       type: 'resourceNode',
       position: { x: 100, y: 150 },
       data: {
-        label: 'Bucket 1',
-        resourceType: 's3',
-        config: { public_access: true },
+        label: 'Firewall 1',
+        resourceType: 'firewall',
+        config: { default_inbound_action: 'deny' },
         findingCount: 0,
       },
     };
@@ -119,27 +119,27 @@ describe('EditorStore', () => {
     expect(useEditorStore.getState().nodes).toHaveLength(1);
     expect(useEditorStore.getState().hasUnsavedChanges).toBe(true);
 
-    useEditorStore.getState().selectNode('s3-test');
-    expect(useEditorStore.getState().selectedNodeId).toBe('s3-test');
+    useEditorStore.getState().selectNode('fw-test');
+    expect(useEditorStore.getState().selectedNodeId).toBe('fw-test');
   });
 
   it('updates node config and marks unsaved', () => {
     const node = {
-      id: 's3-test',
+      id: 'fw-test',
       type: 'resourceNode',
       position: { x: 100, y: 150 },
       data: {
-        label: 'Bucket 1',
-        resourceType: 's3',
-        config: { public_access: true },
+        label: 'Firewall 1',
+        resourceType: 'firewall',
+        config: { default_inbound_action: 'allow' },
         findingCount: 0,
       },
     };
     useEditorStore.getState().addNode(node as any);
 
-    useEditorStore.getState().updateNodeConfig('s3-test', { public_access: false, encryption: true });
+    useEditorStore.getState().updateNodeConfig('fw-test', { default_inbound_action: 'deny' });
     const updated = useEditorStore.getState().nodes[0];
-    expect(updated.data.config).toEqual({ public_access: false, encryption: true });
+    expect(updated.data.config).toEqual({ default_inbound_action: 'deny' });
     expect(useEditorStore.getState().hasUnsavedChanges).toBe(true);
   });
 
@@ -149,31 +149,31 @@ describe('EditorStore', () => {
         id: 'scan-1',
         lab_id: 'lab-1',
         timestamp: new Date().toISOString(),
-        total_rules: 10,
-        passed: 9,
+        total_rules: 8,
+        passed: 7,
         failed: 1,
         findings: [
           {
-            rule_id: 'S3_PUBLIC_ACCESS',
-            title: 'Public S3 Bucket',
-            severity: 'high',
-            category: 'Storage',
-            affected_resource_id: 's3-target',
-            affected_resource_name: 'Target S3',
+            rule_id: 'FIREWALL_DEFAULT_ALLOW',
+            title: 'Firewall Inbound Policy Default Allow',
+            severity: 'critical',
+            category: 'Network Security',
+            affected_resource_id: 'fw-target',
+            affected_resource_name: 'Target FW',
             explanation: 'Vulnerable',
-            impact: 'Data leak',
-            remediation: 'Block public',
+            impact: 'Inbound traversal',
+            remediation: 'Set deny',
             references: [],
           },
         ],
-        findings_by_severity: { high: 1 },
-        risk_score: 7.0,
+        findings_by_severity: { critical: 1, high: 0, medium: 0, low: 0 },
+        risk_score: 10.0,
         summary: '1 issue found',
         attack_paths: [],
       },
     });
 
-    const targetFindings = useEditorStore.getState().getNodeFindings('s3-target');
+    const targetFindings = useEditorStore.getState().getNodeFindings('fw-target');
     const otherFindings = useEditorStore.getState().getNodeFindings('other-node');
     expect(targetFindings).toHaveLength(1);
     expect(otherFindings).toHaveLength(0);

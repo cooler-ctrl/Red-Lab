@@ -22,13 +22,23 @@ const nodeTypes = {
 
 // Valid relationship definitions: [sourceType, targetType, relationship_type]
 const VALID_RELATIONSHIPS: Array<[ResourceType, ResourceType, string]> = [
-  ['subnet', 'vpc', 'contains'],
-  ['ec2', 'subnet', 'contains'],
-  ['rds', 'subnet', 'contains'],
-  ['security_group', 'ec2', 'attaches'],
-  ['security_group', 'rds', 'attaches'],
-  ['internet_gateway', 'vpc', 'attaches'],
-  ['iam_role', 'ec2', 'references'],
+  ['pc', 'switch', 'connects'],
+  ['pc', 'router', 'connects'],
+  ['pc', 'firewall', 'connects'],
+  ['pc', 'pc', 'connects'],
+  ['pc', 'external_network', 'connects'],
+  ['server', 'switch', 'connects'],
+  ['server', 'router', 'connects'],
+  ['server', 'firewall', 'connects'],
+  ['server', 'external_network', 'connects'],
+  ['switch', 'router', 'connects'],
+  ['switch', 'firewall', 'connects'],
+  ['switch', 'switch', 'connects'],
+  ['switch', 'external_network', 'connects'],
+  ['router', 'firewall', 'connects'],
+  ['router', 'router', 'connects'],
+  ['external_network', 'firewall', 'connects'],
+  ['external_network', 'router', 'connects'],
 ];
 
 function getValidRelationship(typeA: ResourceType, typeB: ResourceType): {
@@ -138,7 +148,7 @@ function CanvasInner() {
 
       if (!rel.isValid) {
         toastError(
-          `Invalid connection: cannot link ${typeA} with ${typeB}. Allowed connections: Subnet -> VPC, EC2/RDS -> Subnet, SG -> EC2/RDS, IGW -> VPC, IAM -> EC2.`
+          `Invalid connection: cannot link ${typeA} with ${typeB}. Connect endpoints (PC/Server) to Switches, Routers, or Firewalls.`
         );
         return;
       }
@@ -146,7 +156,7 @@ function CanvasInner() {
       // Canonical source & target
       const canonicalSourceId = rel.isReversed ? targetNode.id : sourceNode.id;
       const canonicalTargetId = rel.isReversed ? sourceNode.id : targetNode.id;
-      const relationshipType = rel.relationshipType || 'attaches';
+      const relationshipType = rel.relationshipType || 'connects';
 
       // Check if duplicate edge exists
       const existing = edges.find(
@@ -163,7 +173,7 @@ function CanvasInner() {
         source: canonicalSourceId,
         target: canonicalTargetId,
         animated: true,
-        style: { stroke: '#FF3B4E', strokeWidth: 2 },
+        style: { stroke: '#3B82F6', strokeWidth: 2 },
         data: {
           relationship_type: relationshipType,
           metadata: {},
@@ -171,48 +181,9 @@ function CanvasInner() {
       };
 
       setEdges([...edges, newEdge]);
-      toastSuccess(`Connected ${rel.sourceType} -> ${rel.targetType} (${relationshipType})`);
-
-      // Update node configs automatically to reflect topology
-      if (rel.sourceType === 'subnet' && rel.targetType === 'vpc') {
-        const sub = rel.isReversed ? targetNode : sourceNode;
-        const vpc = rel.isReversed ? sourceNode : targetNode;
-        updateNodeConfig(sub.id, { ...(sub.data as ResourceNodeData).config, vpc_id: vpc.id });
-      } else if (rel.sourceType === 'ec2' && rel.targetType === 'subnet') {
-        const ec2 = rel.isReversed ? targetNode : sourceNode;
-        const sub = rel.isReversed ? sourceNode : targetNode;
-        updateNodeConfig(ec2.id, { ...(ec2.data as ResourceNodeData).config, subnet_id: sub.id });
-      } else if (rel.sourceType === 'rds' && rel.targetType === 'subnet') {
-        const rds = rel.isReversed ? targetNode : sourceNode;
-        const sub = rel.isReversed ? sourceNode : targetNode;
-        updateNodeConfig(rds.id, { ...(rds.data as ResourceNodeData).config, subnet_id: sub.id });
-      } else if (rel.sourceType === 'security_group' && rel.targetType === 'ec2') {
-        const sg = rel.isReversed ? targetNode : sourceNode;
-        const ec2 = rel.isReversed ? sourceNode : targetNode;
-        const cfg = (ec2.data as ResourceNodeData).config as Record<string, any>;
-        const currentSgs: string[] = cfg.security_group_ids || [];
-        if (!currentSgs.includes(sg.id)) {
-          updateNodeConfig(ec2.id, { ...cfg, security_group_ids: [...currentSgs, sg.id] });
-        }
-      } else if (rel.sourceType === 'security_group' && rel.targetType === 'rds') {
-        const sg = rel.isReversed ? targetNode : sourceNode;
-        const rds = rel.isReversed ? sourceNode : targetNode;
-        const cfg = (rds.data as ResourceNodeData).config as Record<string, any>;
-        const currentSgs: string[] = cfg.security_group_ids || [];
-        if (!currentSgs.includes(sg.id)) {
-          updateNodeConfig(rds.id, { ...cfg, security_group_ids: [...currentSgs, sg.id] });
-        }
-      } else if (rel.sourceType === 'internet_gateway' && rel.targetType === 'vpc') {
-        const igw = rel.isReversed ? targetNode : sourceNode;
-        const vpc = rel.isReversed ? sourceNode : targetNode;
-        updateNodeConfig(igw.id, { ...(igw.data as ResourceNodeData).config, vpc_id: vpc.id });
-      } else if (rel.sourceType === 'iam_role' && rel.targetType === 'ec2') {
-        const iam = rel.isReversed ? targetNode : sourceNode;
-        const ec2 = rel.isReversed ? sourceNode : targetNode;
-        updateNodeConfig(ec2.id, { ...(ec2.data as ResourceNodeData).config, iam_role_id: iam.id });
-      }
+      toastSuccess(`Connected ${rel.sourceType} <-> ${rel.targetType}`);
     },
-    [nodes, edges, setEdges, toastError, toastSuccess, toast, updateNodeConfig]
+    [nodes, edges, setEdges, toastError, toastSuccess, toast]
   );
 
   const onNodeClick = useCallback(
@@ -250,14 +221,12 @@ function CanvasInner() {
         <MiniMap
           nodeColor={(node) => {
             const data = node.data as ResourceNodeData;
-            if (data?.resourceType === 'vpc') return '#60A5FA';
-            if (data?.resourceType === 'subnet') return '#818CF8';
-            if (data?.resourceType === 'ec2') return '#F59E0B';
-            if (data?.resourceType === 's3') return '#34D399';
-            if (data?.resourceType === 'rds') return '#A78BFA';
-            if (data?.resourceType === 'security_group') return '#F472B6';
-            if (data?.resourceType === 'iam_role') return '#FB923C';
-            if (data?.resourceType === 'internet_gateway') return '#22D3EE';
+            if (data?.resourceType === 'pc') return '#10B981';
+            if (data?.resourceType === 'router') return '#3B82F6';
+            if (data?.resourceType === 'switch') return '#8B5CF6';
+            if (data?.resourceType === 'server') return '#EC4899';
+            if (data?.resourceType === 'firewall') return '#EF4444';
+            if (data?.resourceType === 'external_network') return '#06B6D4';
             return '#9BA5B5';
           }}
           maskColor="rgba(11, 13, 18, 0.75)"

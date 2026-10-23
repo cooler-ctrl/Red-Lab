@@ -13,13 +13,14 @@ import {
   Shield,
   ShieldAlert,
   Zap,
+  Network,
 } from 'lucide-react';
 import { useLabStore } from '../../stores/labStore';
 import { LabCard } from './LabCard';
 import { CreateLabModal } from './CreateLabModal';
 import { Button } from '../../components/Button';
 import { useToast } from '../../components/Toast';
-import { createExampleLab } from '../../services/exampleLab';
+import { createExampleNetworkLab } from '../../services/exampleNetworkLab';
 import type { Lab } from '../../types';
 
 export function DashboardPage() {
@@ -30,7 +31,7 @@ export function DashboardPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(true);
   const [search, setSearch] = useState('');
-  const [loadingExample, setLoadingExample] = useState(false);
+  const [loadingNetworkExample, setLoadingNetworkExample] = useState(false);
 
   useEffect(() => {
     fetchLabs();
@@ -46,21 +47,21 @@ export function DashboardPage() {
     }
   };
 
-  const handleLoadExample = async () => {
-    setLoadingExample(true);
+  const handleLoadNetworkExample = async () => {
+    setLoadingNetworkExample(true);
     try {
-      const exampleGraph = createExampleLab();
+      const exampleGraph = createExampleNetworkLab();
       const lab = await createLab(
-        'Insecure Cloud Environment (Demo)',
-        'Vulnerable AWS topology with exposed SSH/HTTP, public database, overprivileged IAM role, and unprotected S3 bucket.',
+        'Enterprise Network Attack Lab (Demo)',
+        'Perimeter network topology with External Attacker, Edge Firewall, DMZ Web Server with HTTP/SSH, Core Router, Office LAN, and Internal Hosts.',
         exampleGraph
       );
-      toastSuccess('Example insecure environment loaded!');
+      toastSuccess('Network Attack simulation environment loaded!');
       navigate(`/lab/${lab.id}`);
     } catch (err) {
-      toastError(`Failed to load example lab: ${(err as Error).message}`);
+      toastError(`Failed to load network lab: ${(err as Error).message}`);
     } finally {
-      setLoadingExample(false);
+      setLoadingNetworkExample(false);
     }
   };
 
@@ -106,38 +107,53 @@ export function DashboardPage() {
       {/* Navbar Header */}
       <header className="border-b border-[#293140] bg-[#11151D]/80 backdrop-blur-md sticky top-0 z-30 px-6 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#FF3B4E] to-[#b31424] flex items-center justify-center shadow-lg shadow-red-500/20">
-            <Flame size={20} className="text-white" />
+          <div className="w-9 h-9 rounded-xl overflow-hidden shadow-lg shadow-red-500/20 flex items-center justify-center border border-[#FF3B4E]/30 bg-[#0B0D12]">
+            <img src="/icon.png" alt="RedLab" className="w-full h-full object-contain" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <span className="text-base font-bold tracking-tight text-[#F3F5F8]">RedLab</span>
-              <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[#FF3B4E]/15 text-[#FF3B4E] border border-[#FF3B4E]/30">
-                Cloud Security Simulator
+              <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[#FF3B4E]/15 text-[#FF3B4E] border border-[#FF3B4E]/30 font-mono">
+                v1.1.0
+              </span>
+              <span className="hidden sm:inline text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[#3B82F6]/15 text-[#60A5FA] border border-[#3B82F6]/30">
+                Hybrid Network & Cloud Security
               </span>
             </div>
-            <p className="text-[11px] text-[#9BA5B5]">AWS Architecture Simulation & Threat Modeling</p>
+            <p className="text-[11px] text-[#9BA5B5]">Packet-Level Network Simulation & Threat Modeling Platform</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          {/* Link to Guided Training Scenarios */}
           <Button
             variant="secondary"
             size="sm"
-            onClick={handleLoadExample}
-            loading={loadingExample}
-            icon={<Zap size={14} className="text-[#F5C451]" />}
+            onClick={() => navigate('/scenarios')}
+            icon={<Zap size={14} className="text-[#FF3B4E]" />}
           >
-            Load Example: Insecure Cloud
+            Training Scenarios
           </Button>
 
+          {/* Load Example Network */}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleLoadNetworkExample}
+            loading={loadingNetworkExample}
+            icon={<Network size={14} className="text-[#34D399]" />}
+          >
+            Load Attack Lab Demo
+          </Button>
+
+          {/* Create New Lab */}
           <Button
             variant="primary"
             size="sm"
             onClick={() => setCreateModalOpen(true)}
             icon={<Plus size={15} />}
           >
-            Create New Lab
+            Create Lab
           </Button>
         </div>
       </header>
@@ -153,7 +169,7 @@ export function DashboardPage() {
             <div className="flex items-center gap-2.5">
               <HelpCircle size={16} className="text-[#FF3B4E]" />
               <h2 className="text-xs font-semibold text-[#F3F5F8]">
-                Getting Started with RedLab Security Simulation
+                Getting Started with RedLab Network Attack Simulation
               </h2>
             </div>
             <div className="text-[#9BA5B5]">
@@ -165,12 +181,12 @@ export function DashboardPage() {
             <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-5 text-xs border-t border-[#293140]/60">
               <div className="space-y-1.5 p-3.5 rounded-lg bg-[#171C26] border border-[#293140]">
                 <div className="w-7 h-7 rounded-md bg-[#60A5FA]/15 border border-[#60A5FA]/30 flex items-center justify-center text-[#60A5FA] mb-2">
-                  <Cloud size={16} />
+                  <Network size={16} />
                 </div>
-                <h3 className="font-semibold text-[#F3F5F8]">1. Visual Cloud Modeling</h3>
+                <h3 className="font-semibold text-[#F3F5F8]">1. Visual Network Topologies</h3>
                 <p className="text-[#9BA5B5] leading-relaxed">
-                  Drag and drop AWS resources (VPC, Subnet, EC2, S3, RDS, IAM Roles, Security Groups)
-                  onto the interactive canvas and connect them to establish network hierarchy.
+                  Drag and drop network devices (PCs, Servers, Routers, Switches, Perimeter Firewalls, External WAN)
+                  onto the canvas and link them to build subnets and routed domains.
                 </p>
               </div>
 
@@ -178,10 +194,10 @@ export function DashboardPage() {
                 <div className="w-7 h-7 rounded-md bg-[#FF8A4C]/15 border border-[#FF8A4C]/30 flex items-center justify-center text-[#FF8A4C] mb-2">
                   <Shield size={16} />
                 </div>
-                <h3 className="font-semibold text-[#F3F5F8]">2. Inspect & Configure</h3>
+                <h3 className="font-semibold text-[#F3F5F8]">2. Configure Services & Firewalls</h3>
                 <p className="text-[#9BA5B5] leading-relaxed">
-                  Select any resource on the canvas to configure firewall ingress/egress rules,
-                  IAM policies, storage encryption, and public access endpoints.
+                  Configure listening services (HTTP, SSH, Telnet), IP addressing, static routes, and
+                  inbound/outbound firewall ACL rules directly in the Property Inspector.
                 </p>
               </div>
 
@@ -189,10 +205,10 @@ export function DashboardPage() {
                 <div className="w-7 h-7 rounded-md bg-[#FF3B4E]/15 border border-[#FF3B4E]/30 flex items-center justify-center text-[#FF3B4E] mb-2">
                   <ShieldAlert size={16} />
                 </div>
-                <h3 className="font-semibold text-[#F3F5F8]">3. Scan & Analyze Attacks</h3>
+                <h3 className="font-semibold text-[#F3F5F8]">3. Scan & Simulate Attacks</h3>
                 <p className="text-[#9BA5B5] leading-relaxed">
-                  Execute security scans to identify misconfigurations against CIS cloud benchmarks,
-                  calculate risk scores, and view end-to-end multi-step lateral movement attack paths.
+                  Execute TCP SYN port scans, discover open services, evaluate firewall filtering, and
+                  trace multi-hop network kill chains and lateral attack paths.
                 </p>
               </div>
             </div>
@@ -204,7 +220,7 @@ export function DashboardPage() {
           <div>
             <h2 className="text-lg font-bold text-[#F3F5F8]">Simulation Labs</h2>
             <p className="text-xs text-[#9BA5B5] mt-0.5">
-              Manage your cloud architecture models and security assessment scenarios.
+              Manage your network architecture models and attack simulation labs.
             </p>
           </div>
 
@@ -258,7 +274,7 @@ export function DashboardPage() {
               <p className="text-xs text-[#9BA5B5] max-w-sm mx-auto mt-1">
                 {search
                   ? `No labs matched your search "${search}". Try clearing the filter.`
-                  : 'Get started by creating your first empty cloud lab or loading an insecure demo architecture.'}
+                  : 'Get started by creating your first empty network lab or loading an attack simulation demo architecture.'}
               </p>
             </div>
             <div className="flex items-center justify-center gap-3 pt-2">
@@ -271,11 +287,11 @@ export function DashboardPage() {
               </Button>
               <Button
                 variant="secondary"
-                onClick={handleLoadExample}
-                loading={loadingExample}
-                icon={<Zap size={14} className="text-[#F5C451]" />}
+                onClick={handleLoadNetworkExample}
+                loading={loadingNetworkExample}
+                icon={<Zap size={14} className="text-[#34D399]" />}
               >
-                Load Example Environment
+                Load Attack Lab Demo
               </Button>
             </div>
           </div>

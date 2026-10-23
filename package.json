@@ -1,0 +1,16 @@
+{
+  "name": "redlab",
+  "version": "1.1.0",
+  "private": true,
+  "description": "RedLab — Hybrid Network Simulation & Visual Cloud Security Platform",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "cd backend && python3 -m uvicorn app.main:app --reload --port 8000",
+    "start": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "test": "npm --prefix frontend test",
+    "test:backend": "cd backend && python3 -m pytest tests/ -v",
+    "test:all": "npm --prefix frontend test && cd backend && python3 -m pytest tests/ -v"
+  }
+}

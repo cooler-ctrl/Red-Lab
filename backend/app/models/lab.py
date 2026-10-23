@@ -1,7 +1,7 @@
 import datetime
 from uuid import uuid4
 
-from sqlalchemy import Column, String, DateTime, Integer, JSON, ForeignKey
+from sqlalchemy import Column, String, DateTime, Integer, JSON, ForeignKey, Float
 from sqlalchemy.orm import relationship
 
 from ..core.database import Base
@@ -20,9 +20,10 @@ class Lab(Base):
         onupdate=lambda: datetime.datetime.now(datetime.UTC),
     )
     graph_data = Column(JSON, nullable=False, default=dict)
-    schema_version = Column(String, default="1.0")
+    schema_version = Column(String, default="1.1")
 
     scans = relationship("ScanResult", back_populates="lab", cascade="all, delete-orphan")
+    runs = relationship("LabRun", back_populates="lab", cascade="all, delete-orphan")
 
 
 class ScanResult(Base):
@@ -38,3 +39,21 @@ class ScanResult(Base):
     summary = Column(JSON, default=dict)
 
     lab = relationship("Lab", back_populates="scans")
+
+
+class LabRun(Base):
+    """Represents a simulation or real-lab execution run."""
+    __tablename__ = "lab_runs"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid4()))
+    lab_id = Column(String, ForeignKey("labs.id", ondelete="CASCADE"), nullable=False)
+    mode = Column(String, default="simulator")       # "simulator" | "real_lab"
+    status = Column(String, default="draft")          # RunStatus enum values
+    scenario_id = Column(String, nullable=True)
+    started_at = Column(DateTime, nullable=True)
+    ended_at = Column(DateTime, nullable=True)
+    validation = Column(JSON, nullable=True)          # TopologyValidationResult dict
+    events = Column(JSON, default=list)               # list[NetworkEvent] dicts
+    result_summary = Column(JSON, nullable=True)      # arbitrary result metadata
+
+    lab = relationship("Lab", back_populates="runs")

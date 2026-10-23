@@ -237,8 +237,8 @@ function createMenu() {
             dialog.showMessageBox(mainWindow, {
               type: 'info',
               title: 'About RedLab',
-              message: 'RedLab — Visual Cloud Security Simulation',
-              detail: 'Version 1.0.0 (Desktop Edition)\nInteractive visual cloud threat modeling & deterministic security analysis.',
+              message: 'RedLab — Hybrid Network & Cloud Security Platform',
+              detail: 'Version 1.1.0 (Desktop Edition)\nVisual packet simulation, network protocol analysis, threat modeling & deterministic cloud security.',
               buttons: ['OK'],
             });
           },
@@ -273,6 +273,15 @@ async function initApp() {
 
   // Create native window
   const iconPath = path.join(__dirname, '..', 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
+
+  // Explicitly set macOS Dock icon
+  if (process.platform === 'darwin' && app.dock && fs.existsSync(iconPath)) {
+    try {
+      app.dock.setIcon(iconPath);
+    } catch (e) {
+      console.warn('[RedLab Desktop] Could not set dock icon:', e);
+    }
+  }
 
   mainWindow = new BrowserWindow({
     width: 1440,

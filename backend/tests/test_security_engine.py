@@ -10,426 +10,376 @@ def analyzer():
     return SecurityAnalyzer(registry)
 
 
-def test_registry_has_all_rules():
+def test_registry_has_all_network_rules():
     rules = registry.get_rules()
     rule_ids = {r.rule_id for r in rules}
     expected_rule_ids = {
-        "S3_PUBLIC_ACCESS",
-        "S3_UNENCRYPTED",
-        "SG_OVERLY_PERMISSIVE",
-        "RDS_PUBLIC_ACCESS",
-        "RDS_UNENCRYPTED",
-        "IAM_OVERLY_PERMISSIVE",
-        "EC2_PUBLIC_EXPOSURE",
-        "EC2_MISSING_IAM_ROLE",
-        "SUBNET_PUBLIC_ROUTING",
-        "RESOURCE_MISSING_SG",
+        "FIREWALL_DEFAULT_ALLOW",
+        "SERVER_UNPROTECTED_DIRECT_WAN",
+        "SERVER_PLAINTEXT_PORT",
+        "FIREWALL_PERMISSIVE_ANY_PORT",
+        "HOST_EXPOSED_MANAGEMENT_PORT",
+        "ROUTER_INSECURE_DIRECT_ROUTE",
+        "SWITCH_DEFAULT_VLAN_EXPOSURE",
+        "HOST_MISSING_DEFAULT_GATEWAY",
     }
     assert expected_rule_ids.issubset(rule_ids)
 
 
-# 1. S3 Tests (Positive and Negative)
-def test_s3_public_access_detected(analyzer):
+# 1. Firewall Default Inbound Allow Tests
+def test_firewall_default_allow_detected(analyzer):
     graph = GraphData(
         nodes=[
             GraphNode(
-                id="s3-vuln",
-                type="s3",
-                label="Public Bucket",
-                config={"public_access": True, "block_public_access": False, "encryption": True},
+                id="fw-1",
+                type="firewall",
+                label="Perimeter FW",
+                config={"default_inbound_action": "allow", "inbound_rules": []},
             )
         ]
     )
     result = analyzer.analyze(graph)
-    vuln_findings = [f for f in result["findings"] if f.rule_id == "S3_PUBLIC_ACCESS"]
-    assert len(vuln_findings) == 1
-    assert vuln_findings[0].severity == "high"
-    assert vuln_findings[0].affected_resource_id == "s3-vuln"
+    vuln = [f for f in result["findings"] if f.rule_id == "FIREWALL_DEFAULT_ALLOW"]
+    assert len(vuln) == 1
+    assert vuln[0].severity == "critical"
+    assert vuln[0].affected_resource_id == "fw-1"
 
 
-def test_s3_block_public_access_enabled_passes(analyzer):
+def test_firewall_default_deny_passes(analyzer):
     graph = GraphData(
         nodes=[
             GraphNode(
-                id="s3-safe",
-                type="s3",
-                label="Secure Bucket",
-                config={"public_access": True, "block_public_access": True, "encryption": True},
+                id="fw-safe",
+                type="firewall",
+                label="Hardened FW",
+                config={"default_inbound_action": "deny", "inbound_rules": []},
             )
         ]
     )
     result = analyzer.analyze(graph)
-    vuln_findings = [f for f in result["findings"] if f.rule_id == "S3_PUBLIC_ACCESS"]
-    assert len(vuln_findings) == 0
+    vuln = [f for f in result["findings"] if f.rule_id == "FIREWALL_DEFAULT_ALLOW"]
+    assert len(vuln) == 0
 
 
-def test_s3_unencrypted_detected(analyzer):
+# 2. Unprotected Direct WAN Exposure Tests
+def test_server_direct_wan_exposure_detected(analyzer):
     graph = GraphData(
         nodes=[
-            GraphNode(
-                id="s3-no-enc",
-                type="s3",
-                label="Unencrypted Bucket",
-                config={"public_access": False, "block_public_access": True, "encryption": False},
-            )
+            GraphNode(id="wan", type="external_network", label="Internet", config={}),
+            GraphNode(id="srv", type="server", label="DB Server", config={"ip_address": "203.0.113.5", "default_gateway": "203.0.113.1"}),
+        ],
+        edges=[
+            GraphEdge(id="e1", source="wan", target="srv", relationship_type="connects")
         ]
     )
     result = analyzer.analyze(graph)
-    vuln_findings = [f for f in result["findings"] if f.rule_id == "S3_UNENCRYPTED"]
-    assert len(vuln_findings) == 1
-    assert vuln_findings[0].severity == "medium"
+    vuln = [f for f in result["findings"] if f.rule_id == "SERVER_UNPROTECTED_DIRECT_WAN"]
+    assert len(vuln) == 1
+    assert vuln[0].severity == "critical"
 
 
-def test_s3_encrypted_passes(analyzer):
+def test_server_behind_firewall_passes_wan_exposure(analyzer):
     graph = GraphData(
         nodes=[
-            GraphNode(
-                id="s3-enc",
-                type="s3",
-                label="Encrypted Bucket",
-                config={"public_access": False, "block_public_access": True, "encryption": True},
-            )
+            GraphNode(id="wan", type="external_network", label="Internet", config={}),
+            GraphNode(id="fw", type="firewall", label="Edge FW", config={"default_inbound_action": "deny"}),
+            GraphNode(id="srv", type="server", label="Internal Server", config={"ip_address": "10.0.0.10", "default_gateway": "10.0.0.1"}),
+        ],
+        edges=[
+            GraphEdge(id="e1", source="wan", target="fw", relationship_type="connects"),
+            GraphEdge(id="e2", source="fw", target="srv", relationship_type="connects"),
         ]
     )
     result = analyzer.analyze(graph)
-    vuln_findings = [f for f in result["findings"] if f.rule_id == "S3_UNENCRYPTED"]
-    assert len(vuln_findings) == 0
+    vuln = [f for f in result["findings"] if f.rule_id == "SERVER_UNPROTECTED_DIRECT_WAN"]
+    assert len(vuln) == 0
 
 
-# 2. Security Group Tests (Positive and Negative)
-def test_sg_overly_permissive_ssh_detected(analyzer):
+# 3. Plaintext Protocol Tests
+def test_plaintext_service_detected(analyzer):
     graph = GraphData(
         nodes=[
             GraphNode(
-                id="sg-ssh",
-                type="security_group",
-                label="Open SSH SG",
+                id="srv-telnet",
+                type="server",
+                label="Legacy Server",
                 config={
+                    "ip_address": "10.0.0.5",
+                    "default_gateway": "10.0.0.1",
+                    "services": [
+                        {"name": "Telnet", "port": 23, "protocol": "tcp", "enabled": True}
+                    ]
+                },
+            )
+        ]
+    )
+    result = analyzer.analyze(graph)
+    vuln = [f for f in result["findings"] if f.rule_id == "SERVER_PLAINTEXT_PORT"]
+    assert len(vuln) == 1
+    assert vuln[0].severity == "high"
+
+
+def test_secure_encrypted_service_passes(analyzer):
+    graph = GraphData(
+        nodes=[
+            GraphNode(
+                id="srv-secure",
+                type="server",
+                label="Secure Server",
+                config={
+                    "ip_address": "10.0.0.5",
+                    "default_gateway": "10.0.0.1",
+                    "services": [
+                        {"name": "HTTPS", "port": 443, "protocol": "tcp", "enabled": True}
+                    ]
+                },
+            )
+        ]
+    )
+    result = analyzer.analyze(graph)
+    vuln = [f for f in result["findings"] if f.rule_id == "SERVER_PLAINTEXT_PORT"]
+    assert len(vuln) == 0
+
+
+# 4. Permissive Any-Port Firewall Rule Tests
+def test_permissive_firewall_rule_detected(analyzer):
+    graph = GraphData(
+        nodes=[
+            GraphNode(
+                id="fw-open",
+                type="firewall",
+                label="Perimeter FW",
+                config={
+                    "default_inbound_action": "deny",
                     "inbound_rules": [
-                        {"protocol": "tcp", "port_range": "22", "source": "0.0.0.0/0", "description": "SSH"}
+                        {
+                            "id": "r1",
+                            "action": "allow",
+                            "source": "0.0.0.0/0",
+                            "port_range": "0-65535",
+                            "protocol": "any",
+                            "enabled": True,
+                        }
                     ]
                 },
             )
         ]
     )
     result = analyzer.analyze(graph)
-    vuln_findings = [f for f in result["findings"] if f.rule_id == "SG_OVERLY_PERMISSIVE"]
-    assert len(vuln_findings) == 1
-    assert vuln_findings[0].severity == "high"
+    vuln = [f for f in result["findings"] if f.rule_id == "FIREWALL_PERMISSIVE_ANY_PORT"]
+    assert len(vuln) == 1
+    assert vuln[0].severity == "high"
 
 
-def test_sg_overly_permissive_database_port_is_critical(analyzer):
+def test_restricted_firewall_rule_passes(analyzer):
     graph = GraphData(
         nodes=[
             GraphNode(
-                id="sg-db",
-                type="security_group",
-                label="Open DB SG",
+                id="fw-scoped",
+                type="firewall",
+                label="Scoped FW",
                 config={
+                    "default_inbound_action": "deny",
                     "inbound_rules": [
-                        {"protocol": "tcp", "port_range": "3306", "source": "0.0.0.0/0", "description": "MySQL"}
+                        {
+                            "id": "r1",
+                            "action": "allow",
+                            "source": "192.168.1.0/24",
+                            "port_range": "443",
+                            "protocol": "tcp",
+                            "enabled": True,
+                        }
                     ]
                 },
             )
         ]
     )
     result = analyzer.analyze(graph)
-    vuln_findings = [f for f in result["findings"] if f.rule_id == "SG_OVERLY_PERMISSIVE"]
-    assert len(vuln_findings) == 1
-    assert vuln_findings[0].severity == "critical"
+    vuln = [f for f in result["findings"] if f.rule_id == "FIREWALL_PERMISSIVE_ANY_PORT"]
+    assert len(vuln) == 0
 
 
-def test_sg_restricted_source_passes(analyzer):
+# 5. Exposed Management Port Tests
+def test_exposed_management_port_detected(analyzer):
     graph = GraphData(
         nodes=[
             GraphNode(
-                id="sg-corp",
-                type="security_group",
-                label="Internal SG",
+                id="srv-mgmt",
+                type="server",
+                label="Host with SSH",
                 config={
-                    "inbound_rules": [
-                        {"protocol": "tcp", "port_range": "22", "source": "10.0.0.0/16", "description": "SSH from VPC"},
-                        {"protocol": "tcp", "port_range": "3306", "source": "10.0.1.0/24", "description": "DB from App Subnet"},
+                    "ip_address": "10.0.0.2",
+                    "default_gateway": "10.0.0.1",
+                    "services": [
+                        {"name": "SSH", "port": 22, "protocol": "tcp", "enabled": True}
                     ]
                 },
             )
         ]
     )
     result = analyzer.analyze(graph)
-    vuln_findings = [f for f in result["findings"] if f.rule_id == "SG_OVERLY_PERMISSIVE"]
-    assert len(vuln_findings) == 0
+    vuln = [f for f in result["findings"] if f.rule_id == "HOST_EXPOSED_MANAGEMENT_PORT"]
+    assert len(vuln) == 1
+    assert vuln[0].severity == "medium"
 
 
-# 3. RDS Tests (Positive and Negative)
-def test_rds_public_access_detected(analyzer):
+# 6. Edge Router Without NAT Tests
+def test_router_wan_without_nat_detected(analyzer):
+    graph = GraphData(
+        nodes=[
+            GraphNode(id="wan", type="external_network", label="WAN", config={}),
+            GraphNode(id="rt", type="router", label="Edge Router", config={"nat_enabled": False}),
+        ],
+        edges=[
+            GraphEdge(id="e1", source="wan", target="rt", relationship_type="connects")
+        ]
+    )
+    result = analyzer.analyze(graph)
+    vuln = [f for f in result["findings"] if f.rule_id == "ROUTER_INSECURE_DIRECT_ROUTE"]
+    assert len(vuln) == 1
+
+
+def test_router_wan_with_nat_passes(analyzer):
+    graph = GraphData(
+        nodes=[
+            GraphNode(id="wan", type="external_network", label="WAN", config={}),
+            GraphNode(id="rt", type="router", label="Edge Router", config={"nat_enabled": True}),
+        ],
+        edges=[
+            GraphEdge(id="e1", source="wan", target="rt", relationship_type="connects")
+        ]
+    )
+    result = analyzer.analyze(graph)
+    vuln = [f for f in result["findings"] if f.rule_id == "ROUTER_INSECURE_DIRECT_ROUTE"]
+    assert len(vuln) == 0
+
+
+# 7. Switch Default VLAN Tests
+def test_switch_unsegmented_vlan_detected(analyzer):
     graph = GraphData(
         nodes=[
             GraphNode(
-                id="rds-pub",
-                type="rds",
-                label="Public Postgres",
-                config={
-                    "publicly_accessible": True,
-                    "encryption": True,
-                    "security_group_ids": [],
-                },
+                id="sw-1",
+                type="switch",
+                label="Switch 1",
+                config={"default_vlan": 1, "ports": [{"id": "p1", "vlan": 1}]},
             )
         ]
     )
     result = analyzer.analyze(graph)
-    vuln_findings = [f for f in result["findings"] if f.rule_id == "RDS_PUBLIC_ACCESS"]
-    assert len(vuln_findings) == 1
-    assert vuln_findings[0].severity in ("high", "critical")
+    vuln = [f for f in result["findings"] if f.rule_id == "SWITCH_DEFAULT_VLAN_EXPOSURE"]
+    assert len(vuln) == 1
 
 
-def test_rds_private_passes(analyzer):
+# 8. Host Missing Default Gateway Tests
+def test_host_missing_gateway_detected(analyzer):
     graph = GraphData(
         nodes=[
             GraphNode(
-                id="rds-priv",
-                type="rds",
-                label="Private Postgres",
-                config={
-                    "publicly_accessible": False,
-                    "encryption": True,
-                    "security_group_ids": ["sg-1"],
-                },
+                id="srv-nogw",
+                type="server",
+                label="Server No GW",
+                config={"ip_address": "192.168.1.50", "default_gateway": ""},
             )
         ]
     )
     result = analyzer.analyze(graph)
-    vuln_findings = [f for f in result["findings"] if f.rule_id == "RDS_PUBLIC_ACCESS"]
-    assert len(vuln_findings) == 0
+    vuln = [f for f in result["findings"] if f.rule_id == "HOST_MISSING_DEFAULT_GATEWAY"]
+    assert len(vuln) == 1
 
 
-def test_rds_unencrypted_detected(analyzer):
-    graph = GraphData(
-        nodes=[
-            GraphNode(
-                id="rds-unenc",
-                type="rds",
-                label="Unencrypted DB",
-                config={"publicly_accessible": False, "encryption": False, "security_group_ids": ["sg-1"]},
-            )
-        ]
-    )
-    result = analyzer.analyze(graph)
-    vuln_findings = [f for f in result["findings"] if f.rule_id == "RDS_UNENCRYPTED"]
-    assert len(vuln_findings) == 1
-    assert vuln_findings[0].severity == "medium"
-
-
-# 4. IAM Tests (Positive and Negative)
-def test_iam_wildcard_detected(analyzer):
-    graph = GraphData(
-        nodes=[
-            GraphNode(
-                id="iam-admin",
-                type="iam_role",
-                label="Super Admin Role",
-                config={
-                    "policies": [
-                        {"name": "AdminPolicy", "actions": ["*"], "resources": ["*"]}
-                    ]
-                },
-            )
-        ]
-    )
-    result = analyzer.analyze(graph)
-    vuln_findings = [f for f in result["findings"] if f.rule_id == "IAM_OVERLY_PERMISSIVE"]
-    assert len(vuln_findings) == 1
-    assert vuln_findings[0].severity == "critical"
-
-
-def test_iam_least_privilege_passes(analyzer):
-    graph = GraphData(
-        nodes=[
-            GraphNode(
-                id="iam-scoped",
-                type="iam_role",
-                label="App Role",
-                config={
-                    "policies": [
-                        {"name": "AppS3Reader", "actions": ["s3:GetObject"], "resources": ["arn:aws:s3:::app-data/*"]}
-                    ]
-                },
-            )
-        ]
-    )
-    result = analyzer.analyze(graph)
-    vuln_findings = [f for f in result["findings"] if f.rule_id == "IAM_OVERLY_PERMISSIVE"]
-    assert len(vuln_findings) == 0
-
-
-# 5. EC2 Tests (Positive and Negative)
-def test_ec2_public_exposure_with_open_sg(analyzer):
-    graph = GraphData(
-        nodes=[
-            GraphNode(
-                id="ec2-web",
-                type="ec2",
-                label="Bastion Host",
-                config={"public_ip": True, "security_group_ids": ["sg-open"], "iam_role_id": "iam-1"},
-            ),
-            GraphNode(
-                id="sg-open",
-                type="security_group",
-                label="Open SG",
-                config={
-                    "inbound_rules": [
-                        {"protocol": "tcp", "port_range": "22", "source": "0.0.0.0/0", "description": "SSH"}
-                    ]
-                },
-            ),
-        ]
-    )
-    result = analyzer.analyze(graph)
-    ec2_findings = [f for f in result["findings"] if f.rule_id == "EC2_PUBLIC_EXPOSURE"]
-    assert len(ec2_findings) == 1
-    assert ec2_findings[0].affected_resource_id == "ec2-web"
-
-
-def test_ec2_without_public_ip_passes_exposure(analyzer):
-    graph = GraphData(
-        nodes=[
-            GraphNode(
-                id="ec2-internal",
-                type="ec2",
-                label="Internal Worker",
-                config={"public_ip": False, "security_group_ids": ["sg-open"], "iam_role_id": "iam-1"},
-            ),
-            GraphNode(
-                id="sg-open",
-                type="security_group",
-                label="Open SG",
-                config={
-                    "inbound_rules": [
-                        {"protocol": "tcp", "port_range": "22", "source": "0.0.0.0/0", "description": "SSH"}
-                    ]
-                },
-            ),
-        ]
-    )
-    result = analyzer.analyze(graph)
-    ec2_findings = [f for f in result["findings"] if f.rule_id == "EC2_PUBLIC_EXPOSURE"]
-    assert len(ec2_findings) == 0
-
-
-def test_ec2_missing_iam_role(analyzer):
-    graph = GraphData(
-        nodes=[
-            GraphNode(
-                id="ec2-no-iam",
-                type="ec2",
-                label="Instance without Role",
-                config={"public_ip": False, "security_group_ids": ["sg-1"], "iam_role_id": ""},
-            )
-        ]
-    )
-    result = analyzer.analyze(graph)
-    iam_findings = [f for f in result["findings"] if f.rule_id == "EC2_MISSING_IAM_ROLE"]
-    assert len(iam_findings) == 1
-
-
-# 6. Missing SG Tests
-def test_resource_missing_sg(analyzer):
-    graph = GraphData(
-        nodes=[
-            GraphNode(
-                id="ec2-no-sg",
-                type="ec2",
-                label="Unguarded EC2",
-                config={"public_ip": False, "security_group_ids": [], "iam_role_id": "iam-1"},
-            ),
-            GraphNode(
-                id="rds-no-sg",
-                type="rds",
-                label="Unguarded RDS",
-                config={"publicly_accessible": False, "encryption": True, "security_group_ids": []},
-            ),
-        ]
-    )
-    result = analyzer.analyze(graph)
-    missing_sg_findings = [f for f in result["findings"] if f.rule_id == "RESOURCE_MISSING_SG"]
-    assert len(missing_sg_findings) == 2
-
-
-# 7. Attack Path Analysis Test
+# 9. Attack Path Generation Test
 def test_attack_path_generation(analyzer):
     graph = GraphData(
         nodes=[
+            GraphNode(id="attacker-wan", type="external_network", label="Attacker WAN", config={}),
+            GraphNode(id="edge-router", type="router", label="Edge Router", config={"nat_enabled": True}),
+            GraphNode(id="firewall-dmz", type="firewall", label="DMZ Firewall", config={"default_inbound_action": "allow"}),
             GraphNode(
-                id="ec2-target",
-                type="ec2",
-                label="Public Web Server",
-                config={"public_ip": True, "security_group_ids": ["sg-bad"], "iam_role_id": "iam-admin"},
-            ),
-            GraphNode(
-                id="sg-bad",
-                type="security_group",
-                label="Open SG",
+                id="target-srv",
+                type="server",
+                label="Target Web Server",
                 config={
-                    "inbound_rules": [
-                        {"protocol": "tcp", "port_range": "22", "source": "0.0.0.0/0", "description": "SSH"}
-                    ]
+                    "ip_address": "10.0.0.10",
+                    "default_gateway": "10.0.0.1",
+                    "services": [{"name": "HTTP", "port": 80, "protocol": "tcp", "enabled": True}]
                 },
-            ),
-            GraphNode(
-                id="iam-admin",
-                type="iam_role",
-                label="AdministratorRole",
-                config={
-                    "policies": [
-                        {"name": "AdminPolicy", "actions": ["*"], "resources": ["*"]}
-                    ]
-                },
-            ),
-            GraphNode(
-                id="s3-critical",
-                type="s3",
-                label="Sensitive Customer Data",
-                config={"public_access": True, "block_public_access": False, "encryption": False},
             ),
         ],
-        edges=[],
+        edges=[
+            GraphEdge(id="e1", source="attacker-wan", target="edge-router", relationship_type="connects"),
+            GraphEdge(id="e2", source="edge-router", target="firewall-dmz", relationship_type="connects"),
+            GraphEdge(id="e3", source="firewall-dmz", target="target-srv", relationship_type="connects"),
+        ]
     )
     result = analyzer.analyze(graph)
-    assert len(result["attack_paths"]) >= 1
+    assert len(result["attack_paths"]) > 0
     path = result["attack_paths"][0]
-    assert path.severity == "critical"
-    assert len(path.steps) >= 3
-    assert any(s.resource_id == "ec2-target" for s in path.steps)
-    assert any(s.resource_id == "iam-admin" for s in path.steps)
-    assert any(s.resource_id == "s3-critical" for s in path.steps)
+    assert "attacker-wan" in [s.resource_id for s in path.steps]
+    assert "target-srv" in [s.resource_id for s in path.steps]
+    assert path.severity in ("critical", "high")
 
 
-# 8. Full Remediation Cycle Test
+# 10. Full Remediation Cycle Test
 def test_full_remediation_cycle(analyzer):
-    # Step A: Vulnerable state
-    vulnerable_s3 = GraphNode(
-        id="bucket-1",
-        type="s3",
-        label="Company Files",
-        config={"public_access": True, "block_public_access": False, "encryption": False},
+    # Step 1: Insecure network topology
+    insecure_graph = GraphData(
+        nodes=[
+            GraphNode(
+                id="fw",
+                type="firewall",
+                label="Border Firewall",
+                config={"default_inbound_action": "allow"},
+            ),
+            GraphNode(
+                id="srv",
+                type="server",
+                label="App Server",
+                config={
+                    "ip_address": "10.0.0.10",
+                    "default_gateway": "",
+                    "services": [{"name": "Telnet", "port": 23, "protocol": "tcp", "enabled": True}]
+                },
+            ),
+        ]
     )
-    graph_initial = GraphData(nodes=[vulnerable_s3])
-    res_initial = analyzer.analyze(graph_initial)
-    initial_rule_ids = {f.rule_id for f in res_initial["findings"]}
-    assert "S3_PUBLIC_ACCESS" in initial_rule_ids
-    assert "S3_UNENCRYPTED" in initial_rule_ids
-    assert res_initial["risk_score"] > 0
+    result_insecure = analyzer.analyze(insecure_graph)
+    assert result_insecure["failed"] >= 2
+    assert result_insecure["risk_score"] > 0
 
-    # Step B: Remediation applied
-    fixed_s3 = GraphNode(
-        id="bucket-1",
-        type="s3",
-        label="Company Files",
-        config={"public_access": False, "block_public_access": True, "encryption": True},
+    # Step 2: Remediate all issues
+    remediated_graph = GraphData(
+        nodes=[
+            GraphNode(
+                id="fw",
+                type="firewall",
+                label="Border Firewall",
+                config={
+                    "default_inbound_action": "deny",
+                    "inbound_rules": [
+                        {
+                            "id": "r1",
+                            "action": "allow",
+                            "source": "10.0.0.0/24",
+                            "port_range": "443",
+                            "protocol": "tcp",
+                            "enabled": True,
+                        }
+                    ]
+                },
+            ),
+            GraphNode(
+                id="srv",
+                type="server",
+                label="App Server",
+                config={
+                    "ip_address": "10.0.0.10",
+                    "default_gateway": "10.0.0.1",
+                    "services": [{"name": "HTTPS", "port": 443, "protocol": "tcp", "enabled": True}]
+                },
+            ),
+        ]
     )
-    graph_fixed = GraphData(nodes=[fixed_s3])
-    res_fixed = analyzer.analyze(graph_fixed)
-    fixed_rule_ids = {f.rule_id for f in res_fixed["findings"]}
-    assert "S3_PUBLIC_ACCESS" not in fixed_rule_ids
-    assert "S3_UNENCRYPTED" not in fixed_rule_ids
-    assert res_fixed["failed"] == 0
-    assert res_fixed["risk_score"] == 0.0
+    result_remediated = analyzer.analyze(remediated_graph)
+    assert result_remediated["failed"] == 0
+    assert result_remediated["risk_score"] == 0.0

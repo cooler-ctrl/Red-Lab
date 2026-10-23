@@ -5,8 +5,8 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
-from ..models.lab import Lab, ScanResult
-from ..schemas.lab import LabCreate, LabUpdate, LabImport, GraphData
+from ..models.lab import Lab, ScanResult, LabRun
+from ..schemas.lab import LabCreate, LabUpdate, LabImport, GraphData, VALID_RESOURCE_TYPES
 
 
 def get_labs(db: Session) -> list[Lab]:
@@ -56,11 +56,9 @@ def delete_lab(db: Session, lab_id: str) -> bool:
 
 
 def import_lab(db: Session, data: LabImport) -> Lab:
-    # Validate node references in edges
     node_ids = {n.id for n in data.graph_data.nodes}
-    valid_types = {"vpc", "subnet", "ec2", "s3", "rds", "security_group", "iam_role", "internet_gateway"}
     for node in data.graph_data.nodes:
-        if node.type not in valid_types:
+        if node.type not in VALID_RESOURCE_TYPES:
             raise ValueError(f"Invalid node type: {node.type}")
     for edge in data.graph_data.edges:
         if edge.source not in node_ids:
@@ -81,9 +79,7 @@ def import_lab(db: Session, data: LabImport) -> Lab:
     return lab
 
 
-def save_scan_result(
-    db: Session, lab_id: str, scan_data: dict
-) -> ScanResult:
+def save_scan_result(db: Session, lab_id: str, scan_data: dict) -> ScanResult:
     result = ScanResult(
         id=str(uuid4()),
         lab_id=lab_id,
@@ -109,5 +105,43 @@ def get_scan_history(db: Session, lab_id: str) -> list[ScanResult]:
         .filter(ScanResult.lab_id == lab_id)
         .order_by(ScanResult.created_at.desc())
         .limit(20)
+        .all()
+    )
+
+
+# ---------- LabRun service ----------
+
+def create_run(db: Session, lab_id: str, mode: str = "simulator", scenario_id: str | None = None) -> LabRun:
+    run = LabRun(
+        id=str(uuid4()),
+        lab_id=lab_id,
+        mode=mode,
+        status="draft",
+        scenario_id=scenario_id,
+    )
+    db.add(run)
+    db.commit()
+    db.refresh(run)
+    return run
+
+
+def get_run(db: Session, run_id: str) -> LabRun | None:
+    return db.query(LabRun).filter(LabRun.id == run_id).first()
+
+
+def update_run(db: Session, run: LabRun, **kwargs) -> LabRun:
+    for k, v in kwargs.items():
+        setattr(run, k, v)
+    db.commit()
+    db.refresh(run)
+    return run
+
+
+def get_runs_for_lab(db: Session, lab_id: str) -> list[LabRun]:
+    return (
+        db.query(LabRun)
+        .filter(LabRun.lab_id == lab_id)
+        .order_by(LabRun.started_at.desc())
+        .limit(50)
         .all()
     )

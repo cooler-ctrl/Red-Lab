@@ -56,7 +56,7 @@ def _lab_to_response(lab, db: Session) -> dict:
 
 @router.get("/health")
 def health_check():
-    return {"status": "ok", "app": "RedLab", "version": "1.0.0"}
+    return {"status": "ok", "app": "RedLab", "version": "1.1.0"}
 
 
 @router.get("/labs")

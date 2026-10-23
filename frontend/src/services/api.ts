@@ -1,4 +1,13 @@
-import type { Lab, ScanResult } from '../types';
+import type {
+  Lab,
+  ScanResult,
+  TopologyValidationResult,
+  LabRun,
+  NetworkEvent,
+  Scenario,
+  ScenarioAssessment,
+  ExecutionMode,
+} from '../types';
 
 declare global {
   interface Window {
@@ -10,7 +19,6 @@ const API_BASE =
   (typeof window !== 'undefined' && window.__REDLAB_API_URL__) ||
   import.meta.env.VITE_API_URL ||
   'http://127.0.0.1:8000/api';
-
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${url}`, {
@@ -44,4 +52,42 @@ export const api = {
   // Import/Export
   importLab: (data: unknown) => request<Lab>('/labs/import', { method: 'POST', body: JSON.stringify(data) }),
   exportLab: (id: string) => request<unknown>(`/labs/${id}/export`),
+
+  // v1.1 Network Simulation & Runs
+  validateTopology: (labId: string) =>
+    request<TopologyValidationResult>(`/labs/${labId}/validate`, { method: 'POST' }),
+  startRun: (labId: string, mode: ExecutionMode = 'simulator', scenarioId?: string) =>
+    request<LabRun>(`/labs/${labId}/runs`, {
+      method: 'POST',
+      body: JSON.stringify({ mode, scenario_id: scenarioId }),
+    }),
+  getRun: (runId: string) => request<LabRun>(`/runs/${runId}`),
+  stopRun: (runId: string) => request<LabRun>(`/runs/${runId}/stop`, { method: 'POST' }),
+  getRunEvents: (runId: string, eventType?: string) =>
+    request<NetworkEvent[]>(`/runs/${runId}/events${eventType ? `?event_type=${encodeURIComponent(eventType)}` : ''}`),
+  ping: (labId: string, sourceId: string, destId: string) =>
+    request<NetworkEvent[]>(`/labs/${labId}/ping`, {
+      method: 'POST',
+      body: JSON.stringify({ source_id: sourceId, dest_id: destId }),
+    }),
+  portScan: (labId: string, sourceId: string, destId: string, ports?: number[]) =>
+    request<NetworkEvent[]>(`/labs/${labId}/port-scan`, {
+      method: 'POST',
+      body: JSON.stringify({ source_id: sourceId, dest_id: destId, ports }),
+    }),
+
+  // v1.1 Scenarios
+  listScenarios: () => request<Scenario[]>('/scenarios'),
+  getScenario: (scenarioId: string) => request<Scenario>(`/scenarios/${scenarioId}`),
+  startScenario: (scenarioId: string) =>
+    request<{ message: string; lab_id: string; run_id: string; scenario_id: string }>(
+      `/scenarios/${scenarioId}/start`,
+      { method: 'POST' }
+    ),
+  assessRun: (runId: string, answers?: Record<string, unknown>) =>
+    request<ScenarioAssessment>(`/runs/${runId}/assess`, {
+      method: 'POST',
+      body: JSON.stringify({ answers: answers || {} }),
+    }),
 };
+

@@ -7,11 +7,11 @@
 
 ## 1. Project Mission & Identity
 
-- **Product:** RedLab (Version 1.0)
-- **Concept:** Visual cloud security simulation (like Cisco Packet Tracer, but for AWS cloud security & threat modeling).
-- **Core Loop:** Build Infrastructure on Canvas → Configure Properties → Run Security Scan → Inspect Findings & Attack Paths → Remediate Misconfigurations → Rescan (Deterministic Verification).
+- **Product:** RedLab (Version 1.1)
+- **Concept:** Visual network attack simulation and defense laboratory (like Cisco Packet Tracer, dedicated to computer network security, TCP port scanning, firewall rule filtering, traffic tracing, and attack path analysis).
+- **Core Loop:** Build Network Topology on Canvas → Configure Interfaces, Services & ACLs → Run Network Attack / Port Scan → Inspect Findings & Attack Paths → Remediate Misconfigurations → Rescan (Deterministic Verification).
 - **Hard Constraint:** RedLab is a **local, self-contained educational simulation**.
-  - **DO NOT** add real AWS SDKs (boto3 calling real accounts).
+  - **DO NOT** introduce cloud services, AWS SDKs, or cloud-specific paradigms.
   - **DO NOT** make real external network requests or run exploits.
   - **DO NOT** introduce paid cloud APIs, external LLM dependencies, or mock buttons.
 
@@ -25,8 +25,8 @@ There are **6 team members** on this project. Every member works in an isolated 
 | :--- | :--- | :--- |
 | **Team Lead (Owner)** | Architecture, core schemas, release reviews, integration | `main`, `develop`, `release/*` |
 | **Dev 1 (Canvas & Graph)** | React Flow visual editor, node connectors, canvas UX | `feature/canvas-*` |
-| **Dev 2 (UI & Inspector)** | Inspector forms, SG/IAM rule editors, dashboard, modals | `feature/ui-*` |
-| **Dev 3 (Security Engine)** | Python security rules, registry, attack-path heuristics | `feature/security-*` |
+| **Dev 2 (UI & Inspector)** | Inspector forms, ACL/service editors, dashboard, modals | `feature/ui-*` |
+| **Dev 3 (Security Engine)** | Python network rules, registry, attack-path heuristics | `feature/security-*` |
 | **Dev 4 (Backend & DB)** | FastAPI endpoints, SQLAlchemy models, import/export | `feature/backend-*` |
 | **Dev 5 (QA & Testing)** | Pytest, Vitest, integration tests, CI pipelines | `feature/qa-*`, `test/*` |
 
@@ -64,7 +64,7 @@ redlab/
 │   │   ├── schemas/         # Pydantic v2 schemas (schemas/lab.py)
 │   │   ├── services/        # Business logic & DB queries (services/lab_service.py)
 │   │   ├── security_engine/ # Modular rule registry & analyzer (analyzer.py, registry.py)
-│   │   │   └── rules/       # 10 security rules (s3, sg, rds, iam, ec2, network)
+│   │   │   └── rules/       # 8 network security rules (network_rules.py)
 │   │   └── main.py          # FastAPI application entry point
 │   ├── tests/               # Pytest suite (test_api.py, test_security_engine.py)
 │   └── requirements.txt
@@ -137,7 +137,7 @@ npm test         # Must pass all Vitest tests
 5. Add unit tests in `backend/tests/test_security_engine.py`.
 6. Run `pytest` to verify.
 
-### Adding a New Cloud Resource Type
+### Adding a New Network Resource Type
 1. Update `backend/app/schemas/lab.py` and `frontend/src/types/index.ts` to include the new type in `ResourceType`.
 2. Add default properties to `DEFAULT_CONFIGS` in `frontend/src/features/editor/ResourceLibrary.tsx`.
 3. Add icon and color in `frontend/src/features/editor/ResourceNode.tsx`.

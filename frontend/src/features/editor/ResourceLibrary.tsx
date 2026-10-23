@@ -2,47 +2,83 @@ import { useState } from 'react';
 import {
   ChevronDown,
   ChevronRight,
-  Database,
   Globe,
-  HardDrive,
-  Key,
+  Monitor,
   Network,
+  Router,
   Search,
   Server,
-  Shield,
-  Layers,
+  ShieldAlert,
 } from 'lucide-react';
 import type { ResourceType } from '../../types';
 
 export const DEFAULT_CONFIGS: Record<ResourceType, Record<string, unknown>> = {
-  vpc: { name: 'My VPC', cidr_block: '10.0.0.0/16', region: 'us-east-1' },
-  subnet: { name: 'My Subnet', cidr_block: '10.0.1.0/24', vpc_id: '', is_public: false },
-  ec2: {
-    name: 'My Instance',
-    instance_type: 't3.micro',
-    subnet_id: '',
-    security_group_ids: [],
-    public_ip: false,
-    iam_role_id: '',
-  },
-  security_group: {
-    name: 'My SG',
-    inbound_rules: [],
-    outbound_rules: [
-      { protocol: '-1', port_range: '0-65535', source: '0.0.0.0/0', description: 'Allow all outbound' },
+  pc: {
+    name: 'PC-1',
+    interfaces: [
+      { id: 'eth0', name: 'eth0', ip_address: '192.168.1.10', cidr_prefix: '24', enabled: true },
     ],
+    default_gateway: '192.168.1.1',
+    dns_servers: ['8.8.8.8'],
+    os: 'Linux',
   },
-  s3: { name: 'my-bucket', public_access: false, block_public_access: true, encryption: true, versioning: false },
-  iam_role: { name: 'My Role', policies: [] },
-  rds: {
-    name: 'My Database',
-    subnet_id: '',
-    publicly_accessible: false,
-    encryption: true,
-    security_group_ids: [],
-    engine: 'postgresql',
+  router: {
+    name: 'Router-1',
+    interfaces: [
+      { id: 'eth0', name: 'eth0', ip_address: '192.168.1.1', cidr_prefix: '24', enabled: true },
+      { id: 'eth1', name: 'eth1', ip_address: '10.0.0.1', cidr_prefix: '24', enabled: true },
+    ],
+    static_routes: [],
+    nat_enabled: false,
   },
-  internet_gateway: { name: 'My IGW', vpc_id: '' },
+  switch: {
+    name: 'Switch-1',
+    ports: [
+      { id: 'p1', name: 'FastEthernet0/1', vlan: 1, enabled: true },
+      { id: 'p2', name: 'FastEthernet0/2', vlan: 1, enabled: true },
+      { id: 'p3', name: 'FastEthernet0/3', vlan: 1, enabled: true },
+      { id: 'p4', name: 'FastEthernet0/4', vlan: 1, enabled: true },
+    ],
+    default_vlan: 1,
+  },
+  server: {
+    name: 'Server-1',
+    ip_address: '10.0.0.10',
+    cidr_prefix: '24',
+    default_gateway: '10.0.0.1',
+    services: [
+      { name: 'HTTP', port: 80, protocol: 'tcp', enabled: true },
+      { name: 'SSH', port: 22, protocol: 'tcp', enabled: true },
+    ],
+    os: 'Ubuntu 24.04',
+  },
+  firewall: {
+    name: 'Firewall-1',
+    ip_address: '10.0.0.1',
+    cidr_prefix: '24',
+    default_gateway: '',
+    inbound_rules: [
+      {
+        id: 'r1',
+        priority: 10,
+        action: 'allow',
+        protocol: 'tcp',
+        source: 'any',
+        destination: 'any',
+        port_range: '80',
+        description: 'Allow HTTP',
+        enabled: true,
+      },
+    ],
+    outbound_rules: [],
+    default_inbound_action: 'deny',
+    default_outbound_action: 'allow',
+  },
+  external_network: {
+    name: 'Internet',
+    description: 'External Internet Network / Attacker WAN',
+    cidr_block: '0.0.0.0/0',
+  },
 };
 
 interface ResourceDefinition {
@@ -60,83 +96,59 @@ interface CategoryDefinition {
 
 const CATEGORIES: CategoryDefinition[] = [
   {
-    name: 'Networking',
+    name: 'Hosts & Endpoints',
     resources: [
       {
-        type: 'vpc',
-        label: 'VPC',
-        description: 'Virtual Private Cloud network',
-        icon: Network,
-        color: '#60A5FA',
+        type: 'pc',
+        label: 'PC / Workstation',
+        description: 'Host endpoint with IP & gateway',
+        icon: Monitor,
+        color: '#10B981',
       },
       {
-        type: 'subnet',
-        label: 'Subnet',
-        description: 'VPC IP subnet range',
-        icon: Network,
-        color: '#818CF8',
-      },
-      {
-        type: 'internet_gateway',
-        label: 'Internet Gateway',
-        description: 'VPC internet route gateway',
-        icon: Globe,
-        color: '#22D3EE',
-      },
-      {
-        type: 'security_group',
-        label: 'Security Group',
-        description: 'Virtual firewall for compute & DB',
-        icon: Shield,
-        color: '#F472B6',
-      },
-    ],
-  },
-  {
-    name: 'Compute',
-    resources: [
-      {
-        type: 'ec2',
-        label: 'EC2 Instance',
-        description: 'Virtual compute server',
+        type: 'server',
+        label: 'Server',
+        description: 'Host running services (HTTP, SSH, DB)',
         icon: Server,
-        color: '#F59E0B',
+        color: '#EC4899',
       },
     ],
   },
   {
-    name: 'Storage',
+    name: 'Routing & Switching',
     resources: [
       {
-        type: 's3',
-        label: 'S3 Bucket',
-        description: 'Scalable cloud object storage',
-        icon: HardDrive,
-        color: '#34D399',
+        type: 'router',
+        label: 'Router',
+        description: 'Layer 3 packet routing & gateways',
+        icon: Router,
+        color: '#3B82F6',
+      },
+      {
+        type: 'switch',
+        label: 'Switch',
+        description: 'Layer 2 ethernet bridge & VLANs',
+        icon: Network,
+        color: '#8B5CF6',
       },
     ],
   },
   {
-    name: 'Database',
+    name: 'Perimeter & Security',
     resources: [
       {
-        type: 'rds',
-        label: 'RDS Database',
-        description: 'Relational database instance',
-        icon: Database,
-        color: '#A78BFA',
+        type: 'firewall',
+        label: 'Firewall',
+        description: 'Stateful packet filter & ACL rules',
+        icon: ShieldAlert,
+        color: '#EF4444',
       },
-    ],
-  },
-  {
-    name: 'Identity',
-    resources: [
       {
-        type: 'iam_role',
-        label: 'IAM Role',
-        description: 'Identity with permission policies',
-        icon: Key,
-        color: '#FB923C',
+        type: 'external_network',
+        label: 'External Network',
+        description: 'WAN / Internet boundary segment',
+        icon: Globe,
+        color: '#06B6D4',
       },
     ],
   },
@@ -144,7 +156,6 @@ const CATEGORIES: CategoryDefinition[] = [
 
 interface ResourceLibraryProps {
   collapsed?: boolean;
-  onToggleCollapse?: () => void;
 }
 
 export function ResourceLibrary({ collapsed = false }: ResourceLibraryProps) {
@@ -165,8 +176,7 @@ export function ResourceLibrary({ collapsed = false }: ResourceLibraryProps) {
     resources: cat.resources.filter(
       (r) =>
         r.label.toLowerCase().includes(search.toLowerCase()) ||
-        r.description.toLowerCase().includes(search.toLowerCase()) ||
-        r.type.toLowerCase().includes(search.toLowerCase())
+        r.description.toLowerCase().includes(search.toLowerCase())
     ),
   })).filter((cat) => cat.resources.length > 0);
 
@@ -174,62 +184,60 @@ export function ResourceLibrary({ collapsed = false }: ResourceLibraryProps) {
 
   return (
     <div className="w-64 bg-[#11151D] border-r border-[#293140] flex flex-col h-full select-none">
+      {/* Header */}
       <div className="p-3 border-b border-[#293140]">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#9BA5B5] mb-2">
-          <Layers size={14} className="text-[#FF3B4E]" />
-          <span>Resource Library</span>
-        </div>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-[#9BA5B5] mb-2">
+          Network Device Library
+        </h2>
+        {/* Search */}
         <div className="relative">
-          <Search size={14} className="absolute left-2.5 top-2.5 text-[#9BA5B5]" />
+          <Search className="absolute left-2.5 top-2 text-[#9BA5B5]" size={14} />
           <input
             type="text"
-            placeholder="Filter resources..."
+            placeholder="Search devices..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1.5 pl-8 text-xs text-[#F3F5F8] placeholder-[#9BA5B5]/60 focus:outline-none focus:border-[#FF3B4E] transition-colors"
+            className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1.5 pl-8 text-xs text-[#F3F5F8] placeholder-[#9BA5B5] focus:outline-none focus:border-[#3B82F6]"
           />
         </div>
       </div>
 
+      {/* Categories */}
       <div className="flex-1 overflow-y-auto p-2 space-y-3">
-        {filteredCategories.map((category) => {
-          const isCollapsed = !!collapsedCategories[category.name];
+        {filteredCategories.map((cat) => {
+          const isCollapsed = collapsedCategories[cat.name];
           return (
-            <div key={category.name} className="space-y-1">
+            <div key={cat.name}>
               <button
-                type="button"
-                onClick={() => toggleCategory(category.name)}
-                className="w-full flex items-center justify-between px-2 py-1 text-xs font-medium text-[#9BA5B5] hover:text-[#F3F5F8] hover:bg-[#171C26] rounded transition-colors"
+                onClick={() => toggleCategory(cat.name)}
+                className="flex items-center justify-between w-full text-left px-2 py-1 text-xs font-medium text-[#9BA5B5] hover:text-[#F3F5F8] transition-colors"
               >
-                <span>{category.name}</span>
-                {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                <span>{cat.name}</span>
+                {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
               </button>
 
               {!isCollapsed && (
-                <div className="space-y-1.5 pl-1">
-                  {category.resources.map((res) => {
+                <div className="mt-1 space-y-1">
+                  {cat.resources.map((res) => {
                     const Icon = res.icon;
                     return (
                       <div
                         key={res.type}
                         draggable
                         onDragStart={(e) => onDragStart(e, res.type)}
-                        className="group flex items-start gap-2.5 p-2 bg-[#171C26] border border-[#293140] hover:border-[#3d4a5c] hover:shadow-md rounded-lg cursor-grab active:cursor-grabbing transition-all"
+                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-md bg-[#171C26]/50 hover:bg-[#171C26] border border-transparent hover:border-[#293140] cursor-grab active:cursor-grabbing transition-all group"
                       >
                         <div
-                          className="p-1.5 rounded-md mt-0.5 flex-shrink-0"
-                          style={{
-                            backgroundColor: `${res.color}15`,
-                            border: `1px solid ${res.color}30`,
-                          }}
+                          className="w-7 h-7 rounded flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: `${res.color}20`, color: res.color }}
                         >
-                          <Icon size={16} style={{ color: res.color }} />
+                          <Icon size={16} />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs font-medium text-[#F3F5F8] group-hover:text-white transition-colors truncate">
+                          <div className="text-xs font-medium text-[#F3F5F8] group-hover:text-white truncate">
                             {res.label}
                           </div>
-                          <div className="text-[11px] text-[#9BA5B5] truncate mt-0.5">
+                          <div className="text-[10px] text-[#9BA5B5] truncate">
                             {res.description}
                           </div>
                         </div>
@@ -241,17 +249,7 @@ export function ResourceLibrary({ collapsed = false }: ResourceLibraryProps) {
             </div>
           );
         })}
-
-        {filteredCategories.length === 0 && (
-          <div className="text-center py-6 text-xs text-[#9BA5B5]">No resources matching "{search}"</div>
-        )}
-      </div>
-
-      <div className="p-2 border-t border-[#293140] text-[11px] text-[#9BA5B5] text-center">
-        Drag resources onto canvas to build
       </div>
     </div>
   );
 }
-
-export default ResourceLibrary;

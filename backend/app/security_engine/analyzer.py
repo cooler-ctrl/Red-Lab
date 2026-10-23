@@ -80,76 +80,104 @@ class SecurityAnalyzer:
     def _find_attack_paths(
         self, graph: GraphData, findings: list[Finding]
     ) -> list[AttackPath]:
-        """Simple attack-path analysis: find chains of
-        internet → public EC2 → overpermissive IAM → sensitive resource.
+        """Network attack-path analysis:
+        Find chains from external/attacker entry points through routers/firewalls
+        to vulnerable internal hosts and servers.
         """
         paths: list[AttackPath] = []
         nodes_by_id = {n.id: n for n in graph.nodes}
         finding_resource_ids = {f.affected_resource_id for f in findings}
 
-        ec2_nodes = [n for n in graph.nodes if n.type == "ec2"]
-        for ec2 in ec2_nodes:
-            cfg = ec2.config
-            if not cfg.get("public_ip", False):
-                continue
-            if ec2.id not in finding_resource_ids:
-                continue
+        # Identify entry nodes: external networks or attacker nodes
+        entry_nodes = [
+            n for n in graph.nodes
+            if n.type == "external_network" or "attacker" in n.label.lower()
+        ]
+        # If no explicit external/attacker, use any PC
+        if not entry_nodes:
+            entry_nodes = [n for n in graph.nodes if n.type == "pc"]
 
-            iam_role_id = cfg.get("iam_role_id", "")
-            if not iam_role_id or iam_role_id not in finding_resource_ids:
-                continue
+        # Target nodes: servers with findings or services
+        target_servers = [
+            n for n in graph.nodes
+            if n.type == "server" and (n.id in finding_resource_ids or n.config.get("services"))
+        ]
 
-            iam_node = nodes_by_id.get(iam_role_id)
-            if not iam_node:
-                continue
+        # Intermediary firewalls and routers
+        firewalls = [n for n in graph.nodes if n.type == "firewall"]
+        routers = [n for n in graph.nodes if n.type == "router"]
 
-            # Find sensitive resources (S3, RDS) that also have findings
-            targets = [
-                n
-                for n in graph.nodes
-                if n.type in ("s3", "rds") and n.id in finding_resource_ids
-            ]
-            if not targets:
-                continue
+        for entry in entry_nodes[:2]:
+            for target in target_servers[:3]:
+                if entry.id == target.id:
+                    continue
 
-            steps = [
-                AttackPathStep(
-                    resource_id=ec2.id,
-                    label=ec2.label,
-                    action="Initial access via public IP and open security group",
-                ),
-                AttackPathStep(
-                    resource_id=iam_role_id,
-                    label=iam_node.label,
-                    action="Leverage overly permissive IAM role to escalate privileges",
-                ),
-            ]
-            for t in targets[:3]:
+                steps = [
+                    AttackPathStep(
+                        resource_id=entry.id,
+                        label=entry.label,
+                        action=f"Initial network ingress from {entry.label} ({entry.type})",
+                    ),
+                ]
+
+                # Check for intermediary router
+                if routers:
+                    r = routers[0]
+                    steps.append(
+                        AttackPathStep(
+                            resource_id=r.id,
+                            label=r.label,
+                            action=f"Route packets across subnets via {r.label}",
+                        )
+                    )
+
+                # Check for intermediary firewall
+                if firewalls:
+                    fw = firewalls[0]
+                    fw_has_issues = fw.id in finding_resource_ids
+                    action_msg = (
+                        f"Bypass permissive rules or default-allow policy on {fw.label}"
+                        if fw_has_issues
+                        else f"Traverse permitted ports on {fw.label}"
+                    )
+                    steps.append(
+                        AttackPathStep(
+                            resource_id=fw.id,
+                            label=fw.label,
+                            action=action_msg,
+                        )
+                    )
+
+                # Target server attack step
+                target_services = target.config.get("services", [])
+                service_names = [s.get("name", "service") for s in target_services if isinstance(s, dict)]
+                svc_desc = ", ".join(service_names) if service_names else "exposed ports"
+
                 steps.append(
                     AttackPathStep(
-                        resource_id=t.id,
-                        label=t.label,
-                        action=f"Access {t.type.upper()} resource with escalated privileges",
+                        resource_id=target.id,
+                        label=target.label,
+                        action=f"Execute port scan and exploit exposed service ({svc_desc}) on {target.label}",
                     )
                 )
 
-            paths.append(
-                AttackPath(
-                    id=f"attack-path-{ec2.id}",
-                    title="External Access to Sensitive Resources",
-                    description=(
-                        f"An attacker could access the EC2 instance \"{ec2.label}\" "
-                        f"via its public IP, exploit the overly permissive IAM role "
-                        f"\"{iam_node.label}\" to reach sensitive resources."
-                    ),
-                    severity="critical",
-                    steps=steps,
-                    assumptions=[
-                        "Attacker has network access to the public IP",
-                        "EC2 instance has an exploitable vulnerability or misconfiguration",
-                        "IAM role credentials are accessible from the instance metadata service",
-                    ],
+                paths.append(
+                    AttackPath(
+                        id=f"attack-path-{entry.id}-{target.id}",
+                        title=f"Network Ingress & Lateral Attack to {target.label}",
+                        description=(
+                            f"An attacker originating from '{entry.label}' can pivot across the network "
+                            f"infrastructure to reach '{target.label}', probe open services ({svc_desc}), "
+                            f"and compromise the host."
+                        ),
+                        severity="critical" if target.id in finding_resource_ids else "high",
+                        steps=steps,
+                        assumptions=[
+                            "Attacker has network reachability to the entry boundary or local segment",
+                            "Network path forwards packets to target subnet",
+                            "Host runs unhardened services or permissive firewall rules permit ingress",
+                        ],
+                    )
                 )
-            )
 
         return paths

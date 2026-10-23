@@ -86,11 +86,21 @@ def run_tests() -> int:
             if callable(attr) and getattr(attr, "__is_pytest_fixture__", False):
                 mod_fixtures[attr_name] = attr
 
-        test_funcs = [
-            (name, getattr(test_mod, name))
-            for name in dir(test_mod)
-            if name.startswith("test_") and callable(getattr(test_mod, name))
-        ]
+        test_funcs = []
+        for name in dir(test_mod):
+            attr = getattr(test_mod, name)
+            if name.startswith("test_") and callable(attr) and not inspect.isclass(attr):
+                test_funcs.append((name, attr))
+            elif name.startswith("Test") and inspect.isclass(attr):
+                try:
+                    cls_inst = attr()
+                    for method_name in dir(attr):
+                        if method_name.startswith("test_"):
+                            method = getattr(cls_inst, method_name)
+                            if callable(method):
+                                test_funcs.append((f"{name}::{method_name}", method))
+                except Exception:
+                    pass
 
         for test_name, test_fn in test_funcs:
             teardown_stack: list[Any] = []

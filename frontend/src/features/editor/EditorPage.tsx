@@ -12,7 +12,7 @@ import { EditorToolbar } from './EditorToolbar';
 import { ResourceLibrary } from './ResourceLibrary';
 import { EditorCanvas } from './EditorCanvas';
 import { PropertyInspector } from './PropertyInspector';
-import { ScanPanel } from '../security/ScanPanel';
+import { SimulationPanel } from '../simulation/SimulationPanel';
 import { useToast } from '../../components/Toast';
 
 export function EditorPage() {
@@ -153,8 +153,8 @@ export function EditorPage() {
         <PropertyInspector collapsed={inspectorCollapsed} />
       </div>
 
-      {/* Bottom Scan Results Panel */}
-      <ScanPanel />
+      {/* Bottom Unified Scan & Simulation Panel */}
+      <SimulationPanel />
     </div>
   );
 }

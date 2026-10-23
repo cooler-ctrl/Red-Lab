@@ -27,6 +27,6 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def init_db() -> None:
-    """Create all tables."""
-    from ..models.lab import Lab, ScanResult  # noqa: F401
+    """Create all tables (including v1.1 LabRun)."""
+    from ..models.lab import Lab, ScanResult, LabRun  # noqa: F401
     Base.metadata.create_all(bind=engine)

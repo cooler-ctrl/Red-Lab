@@ -1,14 +1,14 @@
 # RedLab — Architecture & System Design Document
 
-**Version:** 1.0.0  
-**Status:** Functional MVP  
-**Target Architecture:** Multi-tier Cloud Security Simulation Platform  
+**Version:** 1.1.0  
+**Status:** Functional  
+**Target Architecture:** Visual Network Security & Attack Simulation Platform  
 
 ---
 
 ## 1. Executive Summary
 
-RedLab is an interactive, browser-based cloud security laboratory inspired by Cisco Packet Tracer. Users visually assemble AWS cloud architectures on a canvas, configure node attributes, connect resources with typed relationships, and execute a deterministic Python security engine that pinpoints security misconfigurations, calculates contextual risk scores, and reconstructs multi-stage attack paths.
+RedLab is an interactive, browser-based visual network attack simulation and defense laboratory inspired by Cisco Packet Tracer. Users visually construct computer network topologies on a canvas (PCs, Routers, Switches, Servers, Firewalls, External WAN), configure network interfaces, IP addresses, running services, and firewall ACLs, simulate packet traffic, conduct live TCP port scans, inspect network events, and evaluate deterministic network security rules that detect attack surfaces and multi-hop attack paths.
 
 ---
 
@@ -19,28 +19,36 @@ graph TD
     subgraph Browser ["Frontend (React 19 + TypeScript + Vite)"]
         UI["Editor UI & Dashboard"]
         Canvas["React Flow Canvas (@xyflow/react)"]
-        Store["Zustand Stores (Editor & Lab State)"]
+        Store["Zustand Stores (Editor, Lab & Simulation State)"]
         ApiClient["Typed REST API Client (Fetch)"]
-        Inspector["Property Inspector & Rule Editors"]
+        Inspector["Property Inspector (Interfaces, Services, ACLs, NAT)"]
         FindingsView["Scan Findings & Attack Path Viewer"]
+        SimPanel["Interactive Simulation & Port Scanner Panel"]
         
         UI --> Canvas
         Canvas --> Store
         Inspector --> Store
         Store --> ApiClient
         Store --> FindingsView
+        Store --> SimPanel
     end
 
     subgraph Backend ["Backend (FastAPI + Python 3.14)"]
-        Router["FastAPI REST Endpoints (/api)"]
-        ServiceLayer["Lab & Scan Service Layer"]
-        ORM["SQLAlchemy ORM + SQLite / PostgreSQL"]
+        Router["FastAPI REST Endpoints (/api/labs, /api/runs, /api/scenarios)"]
+        ServiceLayer["Lab, Run & Scenario Service Layer"]
+        ORM["SQLAlchemy ORM + SQLite"]
         
-        subgraph Engine ["Security Analysis Engine"]
+        subgraph NetEngine ["Network Engine"]
+            TopologyValidator["Topology Validator"]
+            ConnectivityEval["Connectivity & Routing Evaluator"]
+            Simulator["Traffic & Port Scan Simulator"]
+        end
+
+        subgraph SecEngine ["Security Engine"]
             Registry["Modular Rule Registry"]
-            Rules["10 Deterministic Security Rules"]
+            Rules["Network Security Rules"]
             Analyzer["Graph Security Analyzer"]
-            AttackEngine["Attack-Path Tracing Engine"]
+            AttackEngine["Network Attack-Path Ingress Analyzer"]
             
             Registry --> Rules
             Analyzer --> Registry
@@ -49,7 +57,8 @@ graph TD
         
         Router --> ServiceLayer
         ServiceLayer --> ORM
-        Router --> Analyzer
+        Router --> NetEngine
+        Router --> SecEngine
     end
 
     ApiClient <-->|JSON / REST| Router
@@ -59,34 +68,31 @@ graph TD
 
 ## 3. Data Flow & Execution Model
 
-The lifecycle of an infrastructure simulation lab follows a strict deterministic pipeline:
+The lifecycle of a network attack simulation follows a deterministic pipeline:
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as Student / Engineer
+    actor User as Security Engineer
     participant FE as React Frontend (Zustand + React Flow)
     participant API as FastAPI REST Router
-    participant DB as SQLite Storage
+    participant NET as Network Engine
     participant SEC as Security Analysis Engine
 
-    User->>FE: Drags resource onto canvas (e.g. S3, EC2, SG)
-    FE->>FE: Validates connection topology
-    FE->>FE: Updates local graph state & marks unsaved changes
+    User->>FE: Assembles network topology (Attacker PC, Firewall, Server)
+    FE->>API: POST /api/labs/{id}/port-scan (Target: Server, Ports: 20-80)
+    API->>NET: simulate_port_scan(...)
+    Note over NET: Evaluates route hops, firewall ACLs, and listening daemons
+    NET-->>API: Returns port scan events (OPEN, FILTERED, CLOSED)
+    API-->>FE: Live port discovery results displayed in Port Scanner tab
     User->>FE: Clicks "Run Security Scan"
-    FE->>API: PUT /api/labs/{id} (Synchronizes current graph)
-    API->>DB: Persists Lab with updated GraphData JSON
     FE->>API: POST /api/labs/{id}/scan
     API->>SEC: SecurityAnalyzer.analyze(GraphData)
-    Note over SEC: Evaluates all 10 registered security rules
-    Note over SEC: Synthesizes risk score & detects attack chains
+    Note over SEC: Evaluates 8 network security rules & ingress kill chains
     SEC-->>API: Returns findings, risk score, attack paths
-    API->>DB: Stores ScanResult in database
-    API-->>FE: 200 OK with ScanResponse schema
-    FE->>User: Displays badges on canvas, findings list & attack path steps
-    User->>FE: Fixes misconfiguration (e.g. disables public access)
-    User->>FE: Clicks "Run Security Scan"
-    Note over FE,SEC: Rescan produces 0 findings; issue badge disappears
+    API-->>FE: Visualizes attack paths and vulnerable node badges
+    User->>FE: Adds firewall deny rule or disables plaintext service
+    User->>FE: Rescans to verify complete remediation
 ```
 
 ---
@@ -96,76 +102,65 @@ sequenceDiagram
 ### 4.1 Frontend Presentation & Canvas (`frontend/`)
 
 - **State Management (`src/stores/`):**
-  - `editorStore.ts`: Coordinates canvas nodes, edges, active selection, dirty state, and scan results. Maintains bidirectional translation between React Flow's layout coordinate model and RedLab's domain schema.
-  - `labStore.ts`: Manages asynchronous project CRUD, laboratory listings, renaming, and persistence.
+  - `editorStore.ts`: Coordinates canvas nodes, edges, selection, and security scan results.
+  - `labStore.ts`: Manages laboratory CRUD, imports/exports, and persistence.
+  - `simulationStore.ts`: Manages live ICMP ping traces, port scans, and packet event logs.
 - **Visual Canvas (`src/features/editor/`):**
-  - `EditorCanvas.tsx`: Built on `@xyflow/react`. Implements custom node types, drag-and-drop ingestion, snapping, zoom/pan navigation, and connection validation guards.
-  - `ResourceNode.tsx`: Custom React Flow node providing directional handles, icon badges, labels, and real-time finding count alert chips.
-  - `PropertyInspector.tsx`: Dynamic right-hand panel rendering context-specific forms for VPCs, Subnets, EC2 instances, S3 buckets, RDS databases, IAM roles, and Security Groups.
-- **Security Presentation (`src/features/security/`):**
-  - `ScanPanel.tsx`: Collapsible bottom drawer displaying severity breakdown chips, overall risk gauge, and tabbed views for individual findings and lateral attack paths.
-  - `FindingCard.tsx`: Interactive accordion detailing rule ID, affected resource, technical impact, recommended remediation, and AWS documentation links.
-  - `AttackPathView.tsx`: Step-by-step visual chain demonstrating how public entry points bridge to sensitive internal workloads through misconfigured credentials.
+  - `EditorCanvas.tsx`: Built on `@xyflow/react`. Implements node connections, drag-and-drop ingestion, snapping, and link validation guards.
+  - `ResourceNode.tsx`: Renders network device nodes with IP badges, running service counts, directional handles, and alert indicators.
+  - `PropertyInspector.tsx`: Dynamic form inspector for IP interfaces, default gateways, server running services, firewall inbound ACLs, router NAT, and switch VLANs.
+- **Simulation & Security (`src/features/simulation/`, `src/features/security/`):**
+  - `SimulationPanel.tsx`: Collapsible bottom panel with interactive Ping test, Port Scanner tool, and live Network Traffic Event log.
+  - `ScanPanel.tsx`: Security audit drawer displaying risk score, severity breakdown, finding cards, and multi-hop attack paths.
 
 ### 4.2 Backend REST Engine (`backend/`)
 
 - **FastAPI Core (`app/main.py`, `app/api/`):**
-  - Structured route handlers with automated Swagger UI documentation at `/api/docs`.
-  - Strict input sanitization via Pydantic V2 models.
-  - Robust exception handlers returning standard RFC-7807/FastAPI error envelopes.
-- **Persistence Layer (`app/models/`, `app/core/database.py`):**
-  - SQLAlchemy 2.0 Declarative ORM.
-  - `Lab`: Stores laboratory metadata, canvas geometry, and typed node configurations in JSON columns.
-  - `ScanResult`: Stores historical audit trails, passed/failed counters, findings array, and risk score metrics.
-
-### 4.3 Security Analysis Engine (`backend/app/security_engine/`)
-
-- **Registry Pattern (`registry.py`):**
-  - Abstract base class `SecurityRule` with required properties (`rule_id`, `title`, `severity`, `category`) and interface `evaluate(graph: GraphData) -> list[Finding]`.
-  - Extensible `RuleRegistry` allows registering new rules with zero modifications to the core analyzer.
-- **Analyzer (`analyzer.py`):**
-  - Iterates over registered rules against normalized graph inputs.
-  - Computes deterministic risk scores:
-    $$\text{Risk Score} = \min\left(100.0, \; \frac{\sum w_i}{\text{Total Rules} \times 10} \times 100\right)$$
-    where $w_{\text{critical}}=10$, $w_{\text{high}}=7$, $w_{\text{medium}}=4$, $w_{\text{low}}=1$.
-  - Executes lateral movement and privilege escalation analysis across graph edges.
+  - `/api/labs`: Lab CRUD, import, export, and security scan trigger.
+  - `/api/runs`: Interactive simulation execution (pings, port scans, packet trace generation).
+  - `/api/scenarios`: Built-in guided training challenges and automated objective assessment.
+- **Network Engine (`app/network_engine/`):**
+  - `topology.py`: Deep topology validation (duplicate IDs, IP formatting, prefix validity, isolated devices).
+  - `connectivity.py`: Pathfinding, Layer 2/3 forwarding, router next-hop selection, and firewall ACL matching.
+  - `simulator.py`: Deterministic traffic simulation, ICMP packet generator, and TCP port scanner.
+- **Security Engine (`app/security_engine/`):**
+  - Modular `SecurityRule` base class and `RuleRegistry`.
+  - 8 deterministic network rules evaluating WAN exposure, firewall policies, unencrypted ports, and missing segmentation.
+  - Ingress attack path synthesizer tracing external attacker entry points to vulnerable internal targets.
 
 ---
 
 ## 5. Domain Schema & Graph Representation
 
-### Node Definition
+### Network Node Definition
 ```json
 {
-  "id": "ec2-web",
-  "type": "ec2",
-  "label": "Web Server",
-  "position": { "x": 120, "y": 80 },
+  "id": "srv-prod",
+  "type": "server",
+  "label": "Production Web & DB Server",
+  "position": { "x": 300, "y": 200 },
   "config": {
-    "name": "Web Server",
-    "instance_type": "t3.micro",
-    "subnet_id": "subnet-public-1",
-    "security_group_ids": ["sg-public-web"],
-    "public_ip": true,
-    "iam_role_id": "iam-admin"
+    "name": "Production Web & DB Server",
+    "ip_address": "192.168.1.50",
+    "cidr_prefix": "24",
+    "default_gateway": "192.168.1.1",
+    "services": [
+      { "name": "HTTP", "port": 80, "protocol": "TCP", "status": "running" },
+      { "name": "MySQL", "port": 3306, "protocol": "TCP", "status": "running" },
+      { "name": "SSH", "port": 22, "protocol": "TCP", "status": "running" }
+    ]
   }
 }
 ```
 
 ### Edge Definition & Relationship Semantics
-Visual edges represent specific domain associations rather than generic connections:
-| Relationship Type | Source | Target | Semantic Meaning |
-| :--- | :--- | :--- | :--- |
-| `contains` | Subnet | VPC | Network partitioning boundary |
-| `contains` | EC2 / RDS | Subnet | Workload placement in subnet |
-| `attaches` | Internet Gateway | VPC | Public gateway route attachment |
-| `attaches` | Security Group | EC2 / RDS | Stateful firewall assignment |
-| `references` | IAM Role | EC2 | Instance profile credential association |
+All physical and logical connections between devices use the canonical link relationship:
+- `connects`: Layer 2/3 network link between two compatible network devices (PC, Router, Switch, Server, Firewall, External WAN).
 
 ---
 
-## 6. Security & Isolation Boundaries
+## 6. Security & Educational Isolation Boundaries
 
-1. **No External Cloud Execution:** RedLab operates purely in simulation. No real AWS resources are spun up, no credentials are authenticated against external APIs, and no cost is incurred.
-2. **Deterministic Evaluation:** Rule outcomes depend exclusively on the explicit properties and topological connections declared on the canvas.
-3. **Safe Storage:** SQLite database runs locally (`backend/redlab.db`) with transactional rollbacks, preventing partial or corrupt states.
+1. **Self-Contained Local Simulation:** RedLab executes entirely offline in memory. No real external sockets or exploits are launched.
+2. **Deterministic Evaluation:** Simulation events, port scans, and rule audits are completely reproducible and derived from the topological state graph.
+3. **Local Persistence:** Laboratories and runs are safely stored in local SQLite (`backend/redlab.db`).

@@ -1,17 +1,21 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  Activity,
   ArrowLeft,
   Check,
+  CheckCircle2,
   Cloud,
   FileCheck,
   Layers,
   Loader2,
   Play,
   Save,
+  Send,
   ShieldAlert,
 } from 'lucide-react';
 import { useEditorStore } from '../../stores/editorStore';
+import { useSimulationStore } from '../../stores/simulationStore';
 import { Button } from '../../components/Button';
 import { useToast } from '../../components/Toast';
 
@@ -26,6 +30,12 @@ export function EditorToolbar() {
   const hasUnsavedChanges = useEditorStore((s) => s.hasUnsavedChanges);
   const saveLab = useEditorStore((s) => s.saveLab);
   const runScan = useEditorStore((s) => s.runScan);
+
+  const validateTopology = useSimulationStore((s) => s.validateTopology);
+  const startSimulation = useSimulationStore((s) => s.startSimulation);
+  const validating = useSimulationStore((s) => s.validating);
+  const runLoading = useSimulationStore((s) => s.runLoading);
+  const setBottomTab = useSimulationStore((s) => s.setBottomTab);
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [labName, setLabName] = useState(lab?.name || 'Untitled Lab');
@@ -48,6 +58,32 @@ export function EditorToolbar() {
     }
   };
 
+  const handleValidate = async () => {
+    if (!lab) return;
+    try {
+      await saveLab();
+      const res = await validateTopology(lab.id);
+      if (res.valid) {
+        toastSuccess('Topology is valid! No errors found.');
+      } else {
+        toastError(`Validation found ${res.errors.length} error(s). Check bottom panel.`);
+      }
+    } catch {
+      toastError('Failed to validate topology');
+    }
+  };
+
+  const handleSimulate = async () => {
+    if (!lab) return;
+    try {
+      await saveLab();
+      const run = await startSimulation(lab.id);
+      toastSuccess(`Simulation complete: ${run.events?.length || 0} packet events generated.`);
+    } catch {
+      toastError('Simulation run failed');
+    }
+  };
+
   return (
     <header className="h-14 bg-[#11151D] border-b border-[#293140] px-4 flex items-center justify-between select-none z-20">
       {/* Left: Back & Title */}
@@ -62,8 +98,8 @@ export function EditorToolbar() {
         </button>
 
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-md bg-[#FF3B4E]/10 border border-[#FF3B4E]/30 flex items-center justify-center">
-            <Cloud size={16} className="text-[#FF3B4E]" />
+          <div className="w-7 h-7 rounded-md overflow-hidden border border-[#FF3B4E]/30 flex items-center justify-center bg-[#0B0D12]">
+            <img src="/icon.png" alt="RedLab" className="w-full h-full object-contain" />
           </div>
 
           <div className="flex items-center gap-2">
@@ -97,10 +133,54 @@ export function EditorToolbar() {
         </div>
       </div>
 
+      {/* Center: Mode Badge */}
+      <div className="hidden lg:flex items-center gap-2 px-3 py-1 rounded-full bg-[#171C26] border border-[#293140] text-xs">
+        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+        <span className="text-[#9BA5B5]">Engine:</span>
+        <span className="font-semibold text-emerald-400">Simulator Mode (Deterministic)</span>
+      </div>
+
       {/* Right: Actions */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
+        {/* Validate Button */}
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={handleValidate}
+          loading={validating}
+          icon={<CheckCircle2 size={13} className="text-[#60A5FA]" />}
+          title="Validate IP addresses, gateways, and link connections"
+        >
+          Validate
+        </Button>
+
+        {/* Simulate Button */}
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={handleSimulate}
+          loading={runLoading}
+          icon={<Activity size={13} className="text-[#34D399]" />}
+          title="Run packet simulation across network topology"
+        >
+          Simulate
+        </Button>
+
+        {/* Quick Ping Tool */}
+        <button
+          type="button"
+          onClick={() => setBottomTab('ping')}
+          className="flex items-center gap-1 px-2.5 py-1.5 bg-[#171C26] hover:bg-[#202736] border border-[#293140] hover:border-[#10B981] text-xs text-[#9BA5B5] hover:text-[#34D399] rounded transition-colors"
+          title="Open Ping Diagnostic Tool"
+        >
+          <Send size={13} />
+          <span className="hidden sm:inline">Ping</span>
+        </button>
+
+        <div className="h-4 w-px bg-[#293140] mx-0.5" />
+
         {/* Save status */}
-        <div className="flex items-center gap-1.5 text-xs">
+        <div className="hidden md:flex items-center gap-1.5 text-xs">
           {saving ? (
             <span className="flex items-center gap-1 text-[#9BA5B5]">
               <Loader2 size={13} className="animate-spin text-[#60A5FA]" />
@@ -109,12 +189,12 @@ export function EditorToolbar() {
           ) : hasUnsavedChanges ? (
             <span className="flex items-center gap-1 text-[#FF8A4C]">
               <span className="w-2 h-2 rounded-full bg-[#FF8A4C] animate-pulse" />
-              Unsaved changes
+              Unsaved
             </span>
           ) : (
             <span className="flex items-center gap-1 text-[#34D399]">
               <Check size={13} />
-              All saved
+              Saved
             </span>
           )}
         </div>
@@ -139,7 +219,7 @@ export function EditorToolbar() {
           loading={scanning}
           icon={<ShieldAlert size={14} />}
         >
-          {scanning ? 'Scanning...' : 'Run Security Scan'}
+          {scanning ? 'Scanning...' : 'Security Scan'}
         </Button>
       </div>
     </header>

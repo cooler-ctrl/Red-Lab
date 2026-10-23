@@ -1,33 +1,36 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { Cloud, Database, Globe, HardDrive, Key, Network, Server, Shield } from 'lucide-react';
+import {
+  Globe,
+  Monitor,
+  Network,
+  Router,
+  Server,
+  ShieldAlert,
+} from 'lucide-react';
 import type { ResourceType } from '../../types';
 
-const RESOURCE_ICONS: Record<ResourceType | string, React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>> = {
-  vpc: Network,
-  subnet: Network,
-  ec2: Server,
-  s3: HardDrive,
-  rds: Database,
-  security_group: Shield,
-  iam_role: Key,
-  internet_gateway: Globe,
+const RESOURCE_ICONS: Record<ResourceType, React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }>> = {
+  pc: Monitor,
+  router: Router,
+  switch: Network,
+  server: Server,
+  firewall: ShieldAlert,
+  external_network: Globe,
 };
 
-const RESOURCE_COLORS: Record<ResourceType | string, string> = {
-  vpc: '#60A5FA',
-  subnet: '#818CF8',
-  ec2: '#F59E0B',
-  s3: '#34D399',
-  rds: '#A78BFA',
-  security_group: '#F472B6',
-  iam_role: '#FB923C',
-  internet_gateway: '#22D3EE',
+const RESOURCE_COLORS: Record<ResourceType, string> = {
+  pc: '#10B981',
+  router: '#3B82F6',
+  switch: '#8B5CF6',
+  server: '#EC4899',
+  firewall: '#EF4444',
+  external_network: '#06B6D4',
 };
 
 function ResourceNode({ data, selected }: NodeProps) {
-  const resourceType = (data.resourceType as string) || 'ec2';
-  const Icon = RESOURCE_ICONS[resourceType] || Cloud;
+  const resourceType = (data.resourceType as ResourceType) || 'pc';
+  const Icon = RESOURCE_ICONS[resourceType] || Server;
   const color = RESOURCE_COLORS[resourceType] || '#9BA5B5';
   const findingCount = (data.findingCount as number) || 0;
   const hasFindings = findingCount > 0;
@@ -76,7 +79,7 @@ function ResourceNode({ data, selected }: NodeProps) {
             {resourceType.replace('_', ' ')}
           </div>
           <div className="text-sm font-medium text-[#F3F5F8] mt-0.5 truncate max-w-[130px]" title={data.label as string}>
-            {(data.label as string) || 'Resource'}
+            {(data.label as string) || 'Device'}
           </div>
         </div>
       </div>

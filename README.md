@@ -1,4 +1,4 @@
-# RedLab — Visual Cloud Security Lab (V1.0)
+# RedLab — Visual Network Attack Simulation & Defense Platform (v1.1.0)
 
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688.svg)](https://fastapi.tiangolo.com/)
@@ -8,39 +8,51 @@
 [![React Flow](https://img.shields.io/badge/@xyflow/react-12.4-FF0072.svg)](https://reactflow.dev/)
 [![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS-v4.0-38B2AC.svg)](https://tailwindcss.com/)
 
-> **RedLab** is an interactive, browser-based cloud security simulation platform inspired by Cisco Packet Tracer, built for computer science students, security engineers, and cloud architects. Users visually construct AWS environments, configure service security postures, execute deterministic security scans, discover vulnerabilities, trace lateral attack paths, and apply defensive remediations.
+> **RedLab (v1.1.0)** is an interactive, browser-based network attack simulation and defense education platform inspired by Cisco Packet Tracer. Users visually construct computer network topologies on a canvas, configure Layer 2/3 devices, simulate live packet flow, conduct deterministic TCP port scanning and service discovery, evaluate firewall ACL rules, inspect deep packet events, evaluate security rules that detect network attack surfaces, trace multi-hop lateral movement attack paths, and complete guided cybersecurity challenges.
 
 ---
 
 ## Key Features
 
-1. **Interactive Visual Infrastructure Editor:**
+1. **Interactive Visual Network Editor:**
    - Full drag-and-drop canvas powered by `@xyflow/react`.
    - Grid background, minimap, zoom, pan, and fit-to-view navigation.
-   - Directional connection validation (e.g. subnets inside VPCs, instances inside subnets, security groups attached to compute/databases).
-   - Real-time finding count alert chips rendered directly on vulnerable canvas nodes.
+   - Comprehensive relationship validation across Layer 2/3 network link topologies.
+   - Real-time finding count alert chips and running service indicators rendered directly on canvas nodes.
 
-2. **Supported Cloud Resources:**
-   - **Networking:** VPC, Public Subnet, Private Subnet, Internet Gateway, Security Group (with structured tabular rule editor).
-   - **Compute:** EC2 Instance (public IP toggle, instance type, IAM role association).
-   - **Storage:** S3 Bucket (Block Public Access, public access flags, server-side encryption, versioning).
-   - **Database:** RDS Database (public accessibility, encryption at rest, subnet binding, engine selection).
-   - **Identity & Access Management:** IAM Role (structured policy editor with allowed actions and resource scoping).
+2. **Network Device & Host Catalog:**
+   - **PC / Workstation:** Endpoint host with multi-interface IP addressing, subnet mask, default gateway, and DNS configuration.
+   - **Router:** Multi-interface Layer 3 routing engine with per-port IP configuration, static routing tables, and NAT support.
+   - **Switch:** Layer 2 broadcast domain forwarding with multi-port bridge and VLAN segmentation.
+   - **Server:** Host running network daemons (HTTP:80, HTTPS:443, SSH:22, MySQL:3306, FTP:21, Telnet:23, custom ports) with default gateway routing.
+   - **Firewall:** Stateful Layer 3/4 packet filter with prioritized rule evaluation (allow/deny, TCP/UDP/ICMP/Any, source/destination/port range).
+   - **External Network:** WAN / Internet boundary definition (0.0.0.0/0) for perimeter attack simulation.
 
-3. **Deterministic Python Security Engine:**
-   - 10 extensible detection rules evaluating real graph topology and configuration fields.
-   - Categorized findings with severity levels (`Critical`, `High`, `Medium`, `Low`).
-   - Contextual risk scoring calculated from weighted severity metrics.
-   - Multi-step attack path analyzer showing realistic attack chains from external public IPs to overprivileged IAM roles and sensitive internal data stores.
+3. **Network Attack & Port Scanning Engine:**
+   - **TCP Port Scanner:** Scan target hosts from any source node (e.g. Attacker PC or External WAN) across specified port ranges or standard profiles.
+   - **Service Discovery & Fingerprinting:** Deterministically maps ports as `OPEN` (daemon listening and reachable), `FILTERED` (blocked by firewall ACL), or `CLOSED` (TCP RST).
+   - **Firewall Evasion & ACL Evaluation:** Tests stateful packet filtering and reveals unauthorized service exposure.
 
-4. **Persistence & Lifecycle:**
-   - Persistent SQLite database storing labs and audit scan history.
+4. **Deterministic Network Simulation Engine:**
+   - **Topology Validation:** Deep validation checking for duplicate IDs, link integrity, IP address syntax, CIDR prefixes, and isolated devices.
+   - **Connectivity Evaluation:** Evaluates same-subnet direct communication, Layer 2 switch forwarding, cross-subnet router hops with gateway validation, and inline firewall filtering.
+   - **Interactive Ping Tool:** Test live connectivity between any two nodes on the canvas with packet exchange trace logs.
+   - **Traffic Inspector:** Packet-level network event log capturing `icmp_request`, `icmp_reply`, `icmp_unreachable`, `port_scan_probe`, `port_scan_open`, `port_scan_filtered`, `firewall_allow`, `firewall_deny`, `routing_lookup`, and `arp_request`.
+
+5. **Guided Training Scenarios with Automated Assessment:**
+   - **Basic Network Connectivity:** Hands-on IP subnetting and gateway routing lab.
+   - **Firewall Defense Lab:** Perimeter security exercise to block unauthorized SSH access while maintaining legitimate web traffic.
+   - **Network Troubleshooting:** Interactive fault diagnostic challenge where students diagnose and remediate broken routing tables and gateway configurations.
+   - Automated deterministic grading engine scoring submitted topologies against scenario objectives.
+
+6. **Network Security & Attack Path Engine:**
+   - 8 deterministic security rules evaluating WAN exposure, firewall policies, unencrypted services, and VLAN segmentation.
+   - Multi-step attack path analyzer showing realistic attack chains from external public IPs and attacker workstations through perimeter firewalls to internal vulnerable servers.
+
+7. **Persistence & Lifecycle:**
+   - Persistent SQLite database storing labs, runs, packet event histories, port scan traces, and security audits.
    - Export and import laboratories as validated JSON packages with schema integrity validation.
-   - One-click loading of a built-in deliberately insecure benchmark environment (*"Insecure Cloud Environment"*).
-
-5. **Team Collaboration & AI Guardrails:**
-   - Pre-configured team git branching workflow for 6-person teams (`TEAM_WORKFLOW.md`).
-   - AI system prompt rules (`AGENTS.md`, `.cursorrules`, `CLAUDE.md`) ensuring AI assistants used by team members strictly adhere to architectural boundaries without drift.
+   - Built-in one-click template: *"Enterprise Perimeter & DMZ Network"*.
 
 ---
 
@@ -65,33 +77,13 @@
 
 ---
 
-## Prerequisites
-
-- **Python:** Version 3.12 or newer (`python3 --version`)
-- **Node.js:** Version 20 or newer (`node --version`)
-- **npm:** Version 10 or newer (`npm --version`)
-
----
-
 ## Desktop Software (macOS & Windows)
 
 RedLab is available as a standalone, downloadable desktop software with zero external setup required:
 - **macOS:** Downloadable `.dmg` disk image and `.zip` archive (Universal Apple Silicon & Intel).
 - **Windows PC:** Graphical installer (`RedLab Setup 1.0.0.exe`) and portable executable (`RedLab 1.0.0.exe`).
 
-For full download instructions, Gatekeeper/SmartScreen guidance, and build scripts, consult the [Desktop Installation Guide](docs/DESKTOP_INSTALLATION.md).
-
-### Packaging Commands:
-```bash
-# macOS Build (generates desktop/dist/RedLab-1.0.0.dmg)
-chmod +x scripts/package-mac.sh
-./scripts/package-mac.sh
-
-# Windows Build (generates desktop/dist/RedLab Setup 1.0.0.exe)
-scripts\build-windows.bat     # Command Prompt
-.\scripts\build-windows.ps1   # PowerShell
-```
-Releases are also automatically built and published via GitHub Actions (`.github/workflows/build-desktop.yml`).
+For full download instructions and build scripts, consult the [Desktop Installation Guide](docs/DESKTOP_INSTALLATION.md).
 
 ---
 
@@ -134,24 +126,25 @@ The Vite dev server automatically proxies `/api` calls to `http://localhost:8000
 
 ## Running Automated Tests
 
-### Backend Unit & Integration Tests (29 Tests)
+### Backend Unit & Integration Tests (66 Tests)
 ```bash
 cd backend
 python3 -m pytest tests/ -v
 ```
 Tests cover:
 - Lab CRUD, validation rejections, export/import schema integrity.
-- Positive and negative cases for all 10 security rules.
-- Multi-step attack path generation.
+- Port scan simulation, firewall filtering, and packet trace generation.
+- Positive and negative cases for all 8 network security rules.
+- Network attack path generation and ingress chain modeling.
 - Full remediation cycle (detect vulnerability $\rightarrow$ update config $\rightarrow$ rescan $\rightarrow$ 0 findings).
 
-### Frontend Component & Store Tests (9 Tests)
+### Frontend Component & Store Tests (14 Tests)
 ```bash
 cd frontend
 npm test
 ```
 Tests cover:
-- Zustand store state transitions (`labStore` and `editorStore`).
+- Zustand store state transitions (`labStore`, `editorStore`, and `simulationStore`).
 - `FindingCard` component rendering, severity pills, accordion expansion, and resource selection callbacks.
 
 ### Frontend Production Build
@@ -173,9 +166,10 @@ redlab/
 │   │   ├── features/
 │   │   │   ├── dashboard/       # DashboardPage, LabCard, CreateLabModal
 │   │   │   ├── editor/          # Canvas, Library, Inspector, ResourceNode
-│   │   │   └── security/        # ScanPanel, FindingCard, AttackPathView
-│   │   ├── services/            # api.ts (REST client), exampleLab.ts
-│   │   ├── stores/              # Zustand editorStore & labStore
+│   │   │   ├── security/        # ScanPanel, FindingCard, AttackPathView
+│   │   │   └── simulation/      # SimulationPanel, PortScanner, TrafficInspector
+│   │   ├── services/            # api.ts (REST client), exampleNetworkLab.ts
+│   │   ├── stores/              # Zustand editorStore, labStore & simulationStore
 │   │   ├── test/                # Vitest test suite & setup
 │   │   ├── theme.ts             # Dark cybersecurity palette
 │   │   └── types/               # TypeScript domain interfaces
@@ -184,25 +178,20 @@ redlab/
 │   └── vitest.config.ts
 ├── backend/
 │   ├── app/
-│   │   ├── api/                 # REST routes (/api/labs, /api/health)
+│   │   ├── api/                 # REST routes (/api/labs, /api/runs, /api/scenarios)
 │   │   ├── core/                # DB engine, config settings
-│   │   ├── models/              # SQLAlchemy Lab & ScanResult models
+│   │   ├── models/              # SQLAlchemy Lab, ScanResult & Run models
 │   │   ├── schemas/             # Pydantic validation schemas
-│   │   ├── services/            # Lab CRUD service logic
-│   │   ├── security_engine/     # Modular security engine
-│   │   │   ├── rules/           # 10 security rule implementations
-│   │   │   ├── analyzer.py      # Graph analyzer & attack path engine
-│   │   │   └── registry.py      # Abstract rule class & registry
+│   │   ├── services/            # Lab, Run, Scenario CRUD service logic
+│   │   ├── network_engine/      # Topology validator, connectivity & port scan simulator
+│   │   ├── security_engine/     # 8 Network rules, analyzer, and attack path engine
 │   │   └── main.py              # FastAPI application entry
-│   ├── tests/                   # Pytest test suite
+│   ├── tests/                   # Pytest test suite (66 tests)
 │   └── requirements.txt
 ├── docs/
 │   ├── architecture.md          # System architecture & sequence diagrams
-│   └── security-rules.md        # Rule catalog & remediation reference
+│   └── security-rules.md        # Network rule catalog & remediation reference
 ├── AGENTS.md                    # Universal AI model guardrails
-├── .cursorrules                 # Cursor IDE rules
-├── CLAUDE.md                    # Claude Code assistant commands & guidelines
-├── TEAM_WORKFLOW.md             # 6-person team Git branching handbook
 └── README.md
 ```
 
@@ -211,38 +200,22 @@ redlab/
 ## The Simulated Security Model
 
 RedLab is a **purely local simulation environment**:
-- No AWS credentials or cloud provider accounts are required.
-- No actual cloud resources are created or billed.
-- Network routing and firewall relationships are evaluated deterministically from graph nodes and typed edges.
-- Risk scores provide immediate pedagogical feedback on infrastructure hardening.
+- No external network sockets or exploits are launched.
+- Network routing, firewall ACLs, and port scan responses are evaluated deterministically from graph nodes and typed edges.
+- Risk scores provide immediate pedagogical feedback on network hardening.
 
 ---
 
 ## Built-In Example Walkthrough
 
-When you open RedLab for the first time, click **"Load Example: Insecure Cloud Environment"** on the Dashboard:
-1. **Explore the Architecture:** The canvas renders a complete 10-node simulated VPC containing an Internet Gateway, Public Subnet, Private Subnet, EC2 Instance, two Security Groups, an S3 Bucket, an RDS Postgres Database, and an IAM Role.
-2. **Execute a Scan:** Click **"Run Security Scan"** in the top toolbar.
-3. **Analyze Findings:** The bottom drawer displays identified misconfigurations:
-   - S3 bucket has public access enabled and Block Public Access disabled.
-   - S3 bucket has encryption disabled.
-   - Security group allows unrestricted port 22 (SSH) and database ports from `0.0.0.0/0`.
-   - RDS database has public accessibility enabled with open firewall rules.
-   - IAM role has full administrative wildcard permissions (`*` on `*`).
-4. **Inspect Attack Paths:** Switch to the **Attack Paths** tab to see how an internet actor can compromise the public EC2 instance, leverage the overprivileged IAM role, and exfiltrate database records.
-5. **Remediate:** Click on the S3 bucket node, toggle off public access, enable Block Public Access, and turn on encryption. Rescan to watch the findings resolve in real-time.
-
----
-
-## Known Limitations & Future Roadmap
-
-### Current Version (V1.0)
-- Local SQLite database (suitable for single-user development).
-- Graph connectivity supports standard containment and attachment relationships; complex multi-hop route tables are represented via subnet and gateway attachments.
-
-### Future Roadmap
-- Guided challenges and interactive scenario tutorials with scoring.
-- Additional AWS services (Lambda, ALB, CloudFront, KMS, DynamoDB).
-- Multi-cloud simulation support (Google Cloud, Azure).
-- Automated Terraform and AWS CloudFormation import/export.
-- Instructor assignment management and student grading dashboards.
+When you open RedLab for the first time, click **"Load Enterprise Network Example"** on the Dashboard:
+1. **Explore the Architecture:** The canvas renders a complete perimeter network containing an External WAN node, an Attacker Workstation, a Stateful Perimeter Firewall, an Internal Switch, and an Internal Application & Database Server.
+2. **Execute a Port Scan:** Open the bottom drawer, select the **Port Scanner** tab, choose the Attacker PC as source and Server as target, and click **"Run TCP Port Scan"**. Observe open ports (HTTP:80, MySQL:3306, SSH:22) discovered through the network path.
+3. **Run Security Scan:** Click **"Run Security Scan"** in the top toolbar.
+4. **Analyze Findings:** Inspect identified network vulnerabilities:
+   - Firewall default policy permits unsolicited traffic.
+   - Permissive firewall rule allows `0.0.0.0/0` access to sensitive internal ports.
+   - Unencrypted cleartext service (HTTP:80) running on server.
+   - Management port (SSH:22) exposed to unauthenticated network access.
+5. **Inspect Attack Paths:** Switch to the **Attack Paths** tab to see how an attacker on the external network bridges past the permissive firewall to exploit vulnerable services.
+6. **Remediate:** Adjust the firewall default policy to `deny`, add specific authorized IP filters, upgrade services to HTTPS/SSH, and rescan to watch the findings resolve in real-time.

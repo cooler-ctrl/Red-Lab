@@ -11,16 +11,16 @@ def test_health_check(client):
 
 def test_create_and_get_lab(client):
     payload = {
-        "name": "Production Architecture",
-        "description": "Simulated multi-tier AWS deployment",
+        "name": "Network Attack Lab",
+        "description": "Simulated enterprise network attack environment",
         "graph_data": {
             "nodes": [
                 {
-                    "id": "vpc-1",
-                    "type": "vpc",
+                    "id": "fw-1",
+                    "type": "firewall",
                     "position": {"x": 50, "y": 50},
-                    "label": "Main VPC",
-                    "config": {"cidr_block": "10.0.0.0/16", "region": "us-east-1"},
+                    "label": "Border Firewall",
+                    "config": {"default_inbound_action": "deny"},
                 }
             ],
             "edges": [],
@@ -31,14 +31,14 @@ def test_create_and_get_lab(client):
     assert res.status_code == 201
     created = res.json()
     lab_id = created["id"]
-    assert created["name"] == "Production Architecture"
+    assert created["name"] == "Network Attack Lab"
     assert created["node_count"] == 1
 
     # Get lab
     res_get = client.get(f"/api/labs/{lab_id}")
     assert res_get.status_code == 200
     assert res_get.json()["id"] == lab_id
-    assert res_get.json()["graph_data"]["nodes"][0]["label"] == "Main VPC"
+    assert res_get.json()["graph_data"]["nodes"][0]["label"] == "Border Firewall"
 
 
 def test_list_labs(client):
@@ -64,16 +64,15 @@ def test_update_lab(client):
         "graph_data": {
             "nodes": [
                 {
-                    "id": "s3-1",
-                    "type": "s3",
+                    "id": "srv-1",
+                    "type": "server",
                     "position": {"x": 100, "y": 100},
-                    "label": "Audit Logs",
+                    "label": "DMZ Web Server",
                     "config": {
-                        "name": "audit-logs",
-                        "public_access": False,
-                        "block_public_access": True,
-                        "encryption": True,
-                        "versioning": True,
+                        "ip_address": "10.0.0.10",
+                        "cidr_prefix": "24",
+                        "default_gateway": "10.0.0.1",
+                        "services": [{"name": "HTTPS", "port": 443, "protocol": "tcp", "enabled": True}],
                     },
                 }
             ],
@@ -118,31 +117,31 @@ def test_validation_error_on_empty_name(client):
 def test_export_and_import_lab(client):
     # Create source lab
     payload = {
-        "name": "Exportable Lab",
+        "name": "Exportable Network Lab",
         "description": "Ready for backup",
         "graph_data": {
             "nodes": [
                 {
-                    "id": "vpc-100",
-                    "type": "vpc",
+                    "id": "sw-100",
+                    "type": "switch",
                     "position": {"x": 0, "y": 0},
-                    "label": "Export VPC",
-                    "config": {"cidr_block": "172.16.0.0/16", "region": "eu-central-1"},
+                    "label": "Core Switch",
+                    "config": {"default_vlan": 1, "ports": []},
                 },
                 {
-                    "id": "subnet-100",
-                    "type": "subnet",
+                    "id": "pc-100",
+                    "type": "pc",
                     "position": {"x": 50, "y": 50},
-                    "label": "Export Subnet",
-                    "config": {"cidr_block": "172.16.1.0/24", "is_public": False},
+                    "label": "Workstation A",
+                    "config": {"interfaces": [{"ip_address": "192.168.1.10", "cidr_prefix": "24", "enabled": True}]},
                 },
             ],
             "edges": [
                 {
                     "id": "e-1",
-                    "source": "subnet-100",
-                    "target": "vpc-100",
-                    "relationship_type": "contains",
+                    "source": "pc-100",
+                    "target": "sw-100",
+                    "relationship_type": "connects",
                     "metadata": {},
                 }
             ],
@@ -155,30 +154,30 @@ def test_export_and_import_lab(client):
     res_export = client.get(f"/api/labs/{lab_id}/export")
     assert res_export.status_code == 200
     exported_data = res_export.json()
-    assert exported_data["name"] == "Exportable Lab"
+    assert exported_data["name"] == "Exportable Network Lab"
     assert len(exported_data["graph_data"]["nodes"]) == 2
 
     # Import as a new lab
-    exported_data["name"] = "Imported Clone"
+    exported_data["name"] = "Imported Network Clone"
     res_import = client.post("/api/labs/import", json=exported_data)
     assert res_import.status_code == 201
     imported_lab = res_import.json()
     assert imported_lab["id"] != lab_id
-    assert imported_lab["name"] == "Imported Clone"
+    assert imported_lab["name"] == "Imported Network Clone"
     assert imported_lab["node_count"] == 2
 
 
 def test_import_validation_rejections(client):
-    # Reject invalid node type
+    # Reject invalid node type (cloud resource should now be rejected!)
     bad_type_payload = {
         "name": "Bad Type",
         "graph_data": {
             "nodes": [
                 {
                     "id": "x-1",
-                    "type": "invalid_cloud_service",
+                    "type": "vpc",
                     "position": {"x": 0, "y": 0},
-                    "label": "Invalid Service",
+                    "label": "Deprecated Cloud VPC",
                     "config": {},
                 }
             ],
@@ -195,10 +194,10 @@ def test_import_validation_rejections(client):
         "graph_data": {
             "nodes": [
                 {
-                    "id": "vpc-1",
-                    "type": "vpc",
+                    "id": "sw-1",
+                    "type": "switch",
                     "position": {"x": 0, "y": 0},
-                    "label": "VPC",
+                    "label": "Switch",
                     "config": {},
                 }
             ],
@@ -206,8 +205,8 @@ def test_import_validation_rejections(client):
                 {
                     "id": "e-bad",
                     "source": "nonexistent-node",
-                    "target": "vpc-1",
-                    "relationship_type": "contains",
+                    "target": "sw-1",
+                    "relationship_type": "connects",
                 }
             ],
         },
@@ -218,24 +217,31 @@ def test_import_validation_rejections(client):
 
 
 def test_scan_api_flow(client):
-    # Create lab with misconfiguration
+    # Create lab with network misconfigurations
     payload = {
-        "name": "Vulnerable Lab",
+        "name": "Vulnerable Network Lab",
         "graph_data": {
             "nodes": [
                 {
-                    "id": "s3-insecure",
-                    "type": "s3",
+                    "id": "fw-insecure",
+                    "type": "firewall",
                     "position": {"x": 0, "y": 0},
-                    "label": "Public Leaky Bucket",
+                    "label": "Permissive Perimeter FW",
                     "config": {
-                        "name": "leaky-bucket",
-                        "public_access": True,
-                        "block_public_access": False,
-                        "encryption": False,
-                        "versioning": False,
+                        "default_inbound_action": "allow",
                     },
-                }
+                },
+                {
+                    "id": "srv-insecure",
+                    "type": "server",
+                    "position": {"x": 100, "y": 100},
+                    "label": "Legacy Telnet Server",
+                    "config": {
+                        "ip_address": "10.0.0.10",
+                        "default_gateway": "",
+                        "services": [{"name": "Telnet", "port": 23, "protocol": "tcp", "enabled": True}],
+                    },
+                },
             ],
             "edges": [],
         },
@@ -247,16 +253,16 @@ def test_scan_api_flow(client):
     res_scan = client.post(f"/api/labs/{lab_id}/scan")
     assert res_scan.status_code == 200
     scan_result = res_scan.json()
-    assert scan_result["total_rules"] == 10
-    assert scan_result["failed"] >= 2  # S3 public access + S3 unencrypted
+    assert scan_result["total_rules"] == 8
+    assert scan_result["failed"] >= 2  # FIREWALL_DEFAULT_ALLOW + SERVER_PLAINTEXT_PORT + HOST_MISSING_DEFAULT_GATEWAY
     assert len(scan_result["findings"]) >= 2
     rule_ids = [f["rule_id"] for f in scan_result["findings"]]
-    assert "S3_PUBLIC_ACCESS" in rule_ids
-    assert "S3_UNENCRYPTED" in rule_ids
+    assert "FIREWALL_DEFAULT_ALLOW" in rule_ids
+    assert "SERVER_PLAINTEXT_PORT" in rule_ids
 
     # Check scan history endpoint
     res_scans = client.get(f"/api/labs/{lab_id}/scans")
     assert res_scans.status_code == 200
     scans_list = res_scans.json()
     assert len(scans_list) == 1
-    assert scans_list[0]["total_rules"] == 10
+    assert scans_list[0]["total_rules"] == 8

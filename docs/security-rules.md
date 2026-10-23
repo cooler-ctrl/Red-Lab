@@ -1,6 +1,6 @@
-# RedLab — Security Rules Catalog (V1.0)
+# RedLab — Network Security & Attack Rules Catalog
 
-This catalog details the initial 10 deterministic security rules implemented in RedLab's Python security engine. Every rule evaluates declared infrastructure properties and graph topologies to flag security misconfigurations, explain their risk, and provide actionable remediation guidance.
+This catalog details the 8 deterministic network security and attack surface rules implemented in RedLab's Python security engine. Every rule evaluates declared device configurations, running services, network interfaces, and graph topologies to flag vulnerabilities, explain attack risks, and provide actionable remediation guidance.
 
 ---
 
@@ -8,124 +8,105 @@ This catalog details the initial 10 deterministic security rules implemented in 
 
 | Rule ID | Title | Default Severity | Category | Target Resource |
 | :--- | :--- | :--- | :--- | :--- |
-| `S3_PUBLIC_ACCESS` | Publicly Accessible S3 Bucket | High | Storage | S3 Bucket |
-| `S3_UNENCRYPTED` | Unencrypted S3 Bucket | Medium | Storage | S3 Bucket |
-| `SG_OVERLY_PERMISSIVE` | Overly Permissive Security Group | High / Critical | Networking | Security Group |
-| `RDS_PUBLIC_ACCESS` | Publicly Accessible Database | High / Critical | Database | RDS Database |
-| `RDS_UNENCRYPTED` | Unencrypted Database | Medium | Database | RDS Database |
-| `IAM_OVERLY_PERMISSIVE` | Overly Permissive IAM Role | High / Critical | Identity | IAM Role |
-| `EC2_PUBLIC_EXPOSURE` | EC2 Instance with Public Exposure | High | Compute | EC2 Instance |
-| `EC2_MISSING_IAM_ROLE` | EC2 Instance Missing IAM Role | Low | Compute | EC2 Instance |
-| `SUBNET_PUBLIC_ROUTING` | Public Subnet with Internet Routing | Low | Networking | Subnet |
-| `RESOURCE_MISSING_SG` | Resource Missing Security Group | Medium | Networking | EC2 / RDS |
+| `FIREWALL_DEFAULT_ALLOW` | Firewall Default Inbound Policy Allows Traffic | Critical | Perimeter Security | Firewall |
+| `SERVER_UNPROTECTED_DIRECT_WAN` | Server Exposed Directly to External WAN | Critical | Perimeter Security | Server |
+| `SERVER_PLAINTEXT_PORT` | Unencrypted Plaintext Network Service Running | Medium | Service Hardening | Server |
+| `FIREWALL_PERMISSIVE_ANY_PORT` | Permissive Firewall Rule Permits Any Source IP | High | Perimeter Security | Firewall |
+| `HOST_EXPOSED_MANAGEMENT_PORT` | Sensitive Management Service Exposed to External Access | High | Service Hardening | Server / PC |
+| `ROUTER_INSECURE_DIRECT_ROUTE` | WAN Router Lacks Network Address Translation (NAT) | High | Network Architecture | Router |
+| `SWITCH_DEFAULT_VLAN_EXPOSURE` | Switch Operating on Unsegmented Default VLAN | Low | Network Segmentation | Switch |
+| `HOST_MISSING_DEFAULT_GATEWAY` | Endpoint Host Missing Default Gateway | Low | Host Configuration | PC / Server |
 
 ---
 
 ## Detailed Rule Specifications
 
-### 1. `S3_PUBLIC_ACCESS`: Publicly Accessible S3 Bucket
-- **Condition:** An S3 bucket has `public_access: true` AND `block_public_access: false`.
-- **Severity:** `High`
-- **Rationale:** Objects inside the bucket are directly reachable over the internet. Attackers can crawl and exfiltrate customer documents, backups, credentials, or proprietary source code.
+### 1. `FIREWALL_DEFAULT_ALLOW`: Firewall Default Inbound Policy Allows Traffic
+- **Condition:** A firewall node has `default_policy: "allow"` or `default_policy: "permit"`.
+- **Severity:** `Critical`
+- **Category:** `Perimeter Security`
+- **Rationale:** A perimeter firewall configured to default-allow acts as an open gateway. In the event of missing or misconfigured specific rules, all unsolicited external traffic, port scans, and ingress attacks reach internal systems unimpeded.
 - **Remediation:**
-  1. Enable S3 Block Public Access at both the bucket and account level.
-  2. Review bucket policies and ACLs to ensure public principal (`"Principal": "*"`) is disallowed.
-  3. Enforce IAM authentication for internal applications consuming bucket objects.
+  1. Change the firewall `default_policy` to `"deny"`.
+  2. Implement an explicit whitelist of required inbound ports and authorized source IPs.
 
 ---
 
-### 2. `S3_UNENCRYPTED`: Unencrypted S3 Bucket
-- **Condition:** An S3 bucket has `encryption: false`.
+### 2. `SERVER_UNPROTECTED_DIRECT_WAN`: Server Exposed Directly to External WAN
+- **Condition:** A server node is connected directly (or via a pure Layer 2 switch) to an `external_network` node without an intervening stateful firewall.
+- **Severity:** `Critical`
+- **Category:** `Perimeter Security`
+- **Rationale:** Servers placed directly on the untrusted WAN edge without a firewall are directly reachable by internet adversaries. Attackers can perform TCP SYN port scanning, banner grabbing, and zero-day exploitation against exposed daemons.
+- **Remediation:**
+  1. Insert an inline firewall node between the external WAN and the internal server or switch.
+  2. Configure inbound firewall rules to restrict traffic to only necessary application ports from authorized sources.
+
+---
+
+### 3. `SERVER_PLAINTEXT_PORT`: Unencrypted Plaintext Network Service Running
+- **Condition:** A server node runs listening services on known unencrypted protocols:
+  - Telnet (Port 23)
+  - FTP (Port 21)
+  - HTTP (Port 80)
 - **Severity:** `Medium`
-- **Rationale:** Without server-side encryption enabled at rest, data stored on physical disks is vulnerable if hardware is decommissioned improperly or accessed out-of-band. Violates compliance frameworks such as HIPAA, PCI-DSS, and SOC 2.
+- **Category:** `Service Hardening`
+- **Rationale:** Cleartext network protocols transmit credentials, session tokens, and application data without cryptographic integrity or confidentiality. Adversaries performing packet capture or man-in-the-middle attacks can inspect and hijack sessions.
 - **Remediation:**
-  1. Turn on default encryption with SSE-S3 (AES-256) or SSE-KMS.
-  2. Require encrypted uploads via bucket policy condition `"s3:x-amz-server-side-encryption": "aws:kms"`.
+  1. Replace unencrypted services with secure equivalents:
+     - Telnet (23) $\rightarrow$ SSH (22)
+     - FTP (21) $\rightarrow$ SFTP / SCP (22) or FTPS
+     - HTTP (80) $\rightarrow$ HTTPS (443) with TLS encryption.
 
 ---
 
-### 3. `SG_OVERLY_PERMISSIVE`: Overly Permissive Security Group
-- **Condition:** An inbound security group rule specifies source `0.0.0.0/0`, `::/0`, or `*` matching sensitive ports:
-  - Port 22 (SSH): `High`
-  - Port 3389 (RDP): `High`
-  - Ports 3306 (MySQL), 5432 (Postgres), 1433 (MSSQL), 27017 (Mongo): `Critical`
-  - All Ports (`0-65535` or `-1`): `Critical`
-  - Ports 80, 443 (HTTP/HTTPS): Not flagged (legitimate public web traffic)
-- **Rationale:** Exposing management or storage ports to the public internet invites automated port scanners, credential stuffing, brute-force dictionary attacks, and zero-day exploitation.
+### 4. `FIREWALL_PERMISSIVE_ANY_PORT`: Permissive Firewall Rule Permits Any Source IP
+- **Condition:** A firewall node contains an inbound rule with `action: "allow"`, `source: "0.0.0.0/0"` or `source: "*"`, and `dest_port` targeting sensitive management or internal ports (e.g., 22, 23, 3389, 3306, 5432, 27017, or all ports `0-65535` / `*`).
+- **Severity:** `High` (Critical for database ports or all-ports)
+- **Category:** `Perimeter Security`
+- **Rationale:** Authorizing wildcard source addresses on sensitive administration or persistence ports exposes internal endpoints to automated vulnerability scanning, brute-force attacks, and direct compromise.
 - **Remediation:**
-  1. Restrict management ports (22, 3389) to specific administrator IP CIDRs (e.g. `203.0.113.4/32`) or route through an AWS Client VPN.
-  2. For databases, never accept `0.0.0.0/0`. Authorize only the security group of the web/application tier (e.g., `sg-app`).
+  1. Restrict the rule's `source` IP/CIDR to authorized administrator or VPN subnets (e.g., `10.0.0.0/24` or `192.168.1.0/24`).
+  2. Avoid open `*` or `0-65535` port ranges on allow rules.
 
 ---
 
-### 4. `RDS_PUBLIC_ACCESS`: Publicly Accessible Database
-- **Condition:** An RDS database has `publicly_accessible: true`.
-  - Severity escalates from `High` to `Critical` if an attached security group also permits `0.0.0.0/0`.
-- **Rationale:** Relational databases store high-value structured business data and should reside exclusively in private subnets. Public IPs make databases vulnerable to distributed denial of service and direct brute force.
-- **Remediation:**
-  1. Disable `publicly_accessible` on the RDS instance.
-  2. Move database instances into private subnets without public internet routes.
-  3. Require database connections to originate through backend workloads or internal bastions.
-
----
-
-### 5. `RDS_UNENCRYPTED`: Unencrypted Database
-- **Condition:** An RDS database has `encryption: false`.
-- **Severity:** `Medium`
-- **Rationale:** Data stored on database storage volumes, automated backups, read replicas, and system snapshots remain unencrypted on disk.
-- **Remediation:**
-  1. Enable KMS encryption when provisioning RDS instances.
-  2. For existing unencrypted databases, create a snapshot, copy the snapshot with encryption enabled, and restore the new encrypted database instance.
-
----
-
-### 6. `IAM_OVERLY_PERMISSIVE`: Overly Permissive IAM Role
-- **Condition:** An IAM role attached policy contains wildcard permissions:
-  - Wildcard action `*` and wildcard resource `*`: `Critical` (full account administrator).
-  - Wildcard service permissions like `iam:*` or `AdministratorAccess`: `High`.
-- **Rationale:** Violates the principle of least privilege. If an attacker gains initial execution on a workload assuming this role, they can access any resource, create rogue IAM accounts, or delete the entire environment.
-- **Remediation:**
-  1. Scrutinize policy actions and replace `*` with specific required APIs (e.g., `s3:GetObject`).
-  2. Scope resources to specific Amazon Resource Names (ARNs) rather than `*`.
-
----
-
-### 7. `EC2_PUBLIC_EXPOSURE`: EC2 Instance with Public Exposure
-- **Condition:** An EC2 instance has `public_ip: true` AND an attached security group that allows unrestricted inbound access (`0.0.0.0/0`) on sensitive management ports (e.g. 22 or 3389).
+### 5. `HOST_EXPOSED_MANAGEMENT_PORT`: Sensitive Management Service Exposed
+- **Condition:** A host or server runs administrative management daemons (SSH port 22, Telnet port 23, RDP port 3389) without firewall inspection or restricted access.
 - **Severity:** `High`
-- **Rationale:** The combination of a public IP and open firewall ports directly exposes the server's OS login surface to internet scanning bots.
+- **Category:** `Service Hardening`
+- **Rationale:** Remote administration ports exposed across broad network segments are high-value targets for brute force, dictionary attacks, and credential stuffing.
 - **Remediation:**
-  1. Disable public IP assignment if the workload does not serve internet clients directly.
-  2. Place instances in private subnets behind an Application Load Balancer (ALB).
-  3. Use AWS Systems Manager (SSM) Session Manager for SSH-less terminal access.
+  1. Restrict management access to dedicated management jump-boxes / bastion subnets.
+  2. Enforce strict firewall ACLs so that only trusted management IP ranges can initiate connections to administrative ports.
 
 ---
 
-### 8. `EC2_MISSING_IAM_ROLE`: EC2 Instance Missing IAM Role
-- **Condition:** An EC2 instance has no `iam_role_id` configured.
+### 6. `ROUTER_INSECURE_DIRECT_ROUTE`: WAN Router Lacks Network Address Translation (NAT)
+- **Condition:** A router node is directly connected to an `external_network` WAN edge but has `nat_enabled: false`.
+- **Severity:** `High`
+- **Category:** `Network Architecture`
+- **Rationale:** Without Network Address Translation (NAT) enabled at the internet boundary, internal private IP space is exposed or unrouteable, and external hosts can attempt direct routing into internal subnets.
+- **Remediation:**
+  1. Enable NAT on the boundary router (`nat_enabled: true`).
+  2. Configure internal private subnets (RFC 1918) behind the NAT-enabled router.
+
+---
+
+### 7. `SWITCH_DEFAULT_VLAN_EXPOSURE`: Switch Operating on Unsegmented Default VLAN
+- **Condition:** A Layer 2 switch operates with `default_vlan: 1` and has multiple attached hosts without VLAN segmentation.
 - **Severity:** `Low`
-- **Rationale:** When workloads lack an attached instance profile, developers often resort to hardcoding static AWS Access Keys in configuration files or environment variables, resulting in high risk of credential leaks.
+- **Category:** `Network Segmentation`
+- **Rationale:** Operating all endpoints inside the default VLAN 1 creates a flat Layer 2 broadcast domain. An attacker who compromises a single endpoint can sniff broadcast traffic, perform ARP poisoning / spoofing, and easily pivot to other systems.
 - **Remediation:**
-  1. Create a dedicated IAM role for the instance.
-  2. Attach the role via an instance profile.
-  3. Allow AWS SDKs to automatically fetch rotating temporary credentials from the Instance Metadata Service (IMDSv2).
+  1. Configure dedicated segmented VLANs for different security zones (e.g., VLAN 10 for Servers, VLAN 20 for Workstations, VLAN 99 for Management).
+  2. Disable or isolate default VLAN 1 for production traffic.
 
 ---
 
-### 9. `SUBNET_PUBLIC_ROUTING`: Public Subnet with Internet Routing
-- **Condition:** A subnet has `is_public: true` and its parent VPC is connected to an Internet Gateway (`internet_gateway`).
-- **Severity:** `Low` (Informational)
-- **Rationale:** Public subnets are expected for edge components (ALBs, NAT gateways), but teams must verify that database and internal application workloads are not accidentally placed inside them.
+### 8. `HOST_MISSING_DEFAULT_GATEWAY`: Endpoint Host Missing Default Gateway
+- **Condition:** A host (PC or Server) has configured static IP interfaces but `default_gateway` is empty or missing.
+- **Severity:** `Low`
+- **Category:** `Host Configuration`
+- **Rationale:** While the host can communicate within its local subnet, it cannot reach external routers, DNS servers, or out-of-subnet resources. In security architectures, missing default gateways can cause routing asymmetry and log delivery failure.
 - **Remediation:**
-  1. Confirm that only public-facing load balancers or bastion hosts are stationed in this subnet.
-  2. Maintain separate private subnets for application and database tiers.
-
----
-
-### 10. `RESOURCE_MISSING_SG`: Resource Missing Security Group
-- **Condition:** An EC2 or RDS resource has no security groups attached (either via config property or visual `attaches` edges).
-- **Severity:** `Medium`
-- **Rationale:** Without an explicit security group, the resource defaults to the VPC default security group or lacks explicit network firewall boundaries.
-- **Remediation:**
-  1. Provision a purpose-built security group for the resource tier.
-  2. Explicitly bind the security group to the compute or database node.
+  1. Configure the `default_gateway` field with the IP address of the local subnet router interface.
