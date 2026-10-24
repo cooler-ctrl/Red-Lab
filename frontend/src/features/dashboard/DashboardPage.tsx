@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import {
   ChevronDown,
   ChevronUp,
-  Cloud,
   FileCode,
   Flame,
   HelpCircle,
@@ -114,10 +113,10 @@ export function DashboardPage() {
             <div className="flex items-center gap-2">
               <span className="text-base font-bold tracking-tight text-[#F3F5F8]">RedLab</span>
               <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[#FF3B4E]/15 text-[#FF3B4E] border border-[#FF3B4E]/30 font-mono">
-                v1.1.0
+                v1.1.1
               </span>
               <span className="hidden sm:inline text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[#3B82F6]/15 text-[#60A5FA] border border-[#3B82F6]/30">
-                Hybrid Network & Cloud Security
+                Network Attack & Defense Platform
               </span>
             </div>
             <p className="text-[11px] text-[#9BA5B5]">Packet-Level Network Simulation & Threat Modeling Platform</p>
@@ -265,7 +264,7 @@ export function DashboardPage() {
         ) : filteredLabs.length === 0 ? (
           <div className="py-20 text-center bg-[#11151D] border border-dashed border-[#293140] rounded-2xl p-8 space-y-4">
             <div className="w-14 h-14 rounded-full bg-[#171C26] border border-[#293140] flex items-center justify-center mx-auto text-[#FF3B4E]">
-              <Cloud size={28} />
+              <Network size={28} />
             </div>
             <div>
               <h3 className="text-base font-semibold text-[#F3F5F8]">
@@ -313,7 +312,7 @@ export function DashboardPage() {
 
       {/* Footer */}
       <footer className="border-t border-[#293140] py-4 px-6 text-center text-[11px] text-[#9BA5B5]">
-        RedLab Cloud Security Simulator &bull; Interactive AWS Infrastructure Modeling
+        RedLab Network Attack & Defense Simulator &bull; Interactive Cyber Security Lab
       </footer>
 
       {/* Create Lab Modal */}

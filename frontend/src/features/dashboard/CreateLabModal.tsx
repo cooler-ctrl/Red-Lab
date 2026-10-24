@@ -51,7 +51,7 @@ export function CreateLabModal({ isOpen, onClose, onSubmit }: CreateLabModalProp
           <input
             type="text"
             required
-            placeholder="e.g., Multi-Tier Cloud Architecture"
+            placeholder="e.g., Enterprise Perimeter Defense Lab"
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="w-full bg-[#171C26] border border-[#293140] rounded px-3 py-2 text-xs text-[#F3F5F8] placeholder-[#9BA5B5]/60 focus:border-[#FF3B4E] focus:outline-none"

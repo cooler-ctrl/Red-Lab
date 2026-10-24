@@ -1,4 +1,4 @@
-# RedLab — Visual Network Attack Simulation & Defense Platform (v1.1.0)
+# RedLab — Visual Network Attack Simulation & Defense Platform (v1.1.1)
 
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688.svg)](https://fastapi.tiangolo.com/)
@@ -8,11 +8,11 @@
 [![React Flow](https://img.shields.io/badge/@xyflow/react-12.4-FF0072.svg)](https://reactflow.dev/)
 [![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS-v4.0-38B2AC.svg)](https://tailwindcss.com/)
 
-> **RedLab (v1.1.0)** is an interactive, browser-based network attack simulation and defense education platform inspired by Cisco Packet Tracer. Users visually construct computer network topologies on a canvas, configure Layer 2/3 devices, simulate live packet flow, conduct deterministic TCP port scanning and service discovery, evaluate firewall ACL rules, inspect deep packet events, evaluate security rules that detect network attack surfaces, trace multi-hop lateral movement attack paths, and complete guided cybersecurity challenges.
+> **RedLab (v1.1.1)** is an interactive, browser-based network attack simulation and defense education platform inspired by Cisco Packet Tracer. Users visually construct computer network topologies on a canvas, configure Layer 2/3 devices, simulate live packet flow, conduct deterministic TCP port scanning and service discovery, evaluate firewall ACL rules, inspect deep packet events, evaluate security rules that detect network attack surfaces, trace multi-hop lateral movement attack paths, and complete guided cybersecurity challenges.
 
 ---
 
-## Key Features in RedLab 1.1.0
+## Key Features in RedLab 1.1.1
 
 1. **Global Attack Mode (RED) & Defend Mode (BLUE):**
    - **Prominent Toolbar Mode Switch:** Seamlessly switch perspectives between Attacker and Defender without rebuilding networks.

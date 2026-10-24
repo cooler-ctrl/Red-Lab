@@ -1,8 +1,8 @@
 {
   "name": "redlab",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
-  "description": "RedLab — Hybrid Network Simulation & Visual Cloud Security Platform",
+  "description": "RedLab — Visual Network Attack & Defense Simulation Platform",
   "scripts": {
     "dev": "npm --prefix frontend run dev",
     "dev:frontend": "npm --prefix frontend run dev",

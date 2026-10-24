@@ -222,7 +222,7 @@ function createMenu() {
           },
         },
         {
-          label: 'Cloud Security Architecture Catalog',
+          label: 'Network Security Architecture Catalog',
           click: async () => {
             if (mainWindow) {
               mainWindow.loadURL(`http://127.0.0.1:${activePort}/api/docs`);
@@ -237,8 +237,8 @@ function createMenu() {
             dialog.showMessageBox(mainWindow, {
               type: 'info',
               title: 'About RedLab',
-              message: 'RedLab — Hybrid Network & Cloud Security Platform',
-              detail: 'Version 1.1.0 (Desktop Edition)\nVisual packet simulation, network protocol analysis, threat modeling & deterministic cloud security.',
+              message: 'RedLab — Network Attack & Defense Platform',
+              detail: 'Version 1.1.1 (Desktop Edition)\nVisual packet simulation, network protocol analysis, threat modeling & deterministic network security.',
               buttons: ['OK'],
             });
           },
@@ -291,7 +291,7 @@ async function initApp() {
     backgroundColor: '#0B0D12',
     icon: fs.existsSync(iconPath) ? iconPath : undefined,
     show: false,
-    title: 'RedLab — Visual Cloud Security Lab',
+    title: 'RedLab — Network Attack & Defense Lab',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,

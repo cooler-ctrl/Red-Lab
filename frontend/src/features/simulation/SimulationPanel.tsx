@@ -1006,7 +1006,7 @@ export function SimulationPanel() {
                   <div>
                     <p className="text-sm font-semibold text-[#F3F5F8]">Evaluating Security Policies</p>
                     <p className="text-xs text-[#9BA5B5] mt-1">
-                      Analyzing architecture graph, firewalls, IAM permissions, and attack surfaces...
+                      Analyzing network topology, firewalls, exposed ports, and attack paths...
                     </p>
                   </div>
                 </div>
@@ -1016,7 +1016,7 @@ export function SimulationPanel() {
                   <div>
                     <p className="text-sm font-semibold text-[#F3F5F8]">No Scan Executed Yet</p>
                     <p className="text-xs text-[#9BA5B5] mt-1 max-w-sm">
-                      Run a security scan to evaluate cloud misconfigurations, open database ports, and IAM risks.
+                      Run a network security scan to evaluate open services, firewall filtering, and attack paths.
                     </p>
                   </div>
                   <Button variant="primary" size="sm" onClick={runScan} icon={<Play size={13} />}>

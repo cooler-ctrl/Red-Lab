@@ -1,13 +1,13 @@
 # AI MODEL INSTRUCTIONS & ARCHITECTURAL GUARDRAILS
 
 > **CRITICAL NOTICE FOR ALL AI CODING ASSISTANTS & MODELS (Cursor, Claude, Copilot, ChatGPT, Antigravity):**  
-> You are working inside the **RedLab** repository—a visual cloud security laboratory. You are pair-programming with one of the 6 engineering team members. **You must strictly obey the architectural rules, directory structures, and git conventions defined below.** Do not deviate, drift, invent unsupported schemas, or rewrite working modules.
+> You are working inside the **RedLab** repository—a visual network attack and defense laboratory. You are pair-programming with one of the 6 engineering team members. **You must strictly obey the architectural rules, directory structures, and git conventions defined below.** Do not deviate, drift, invent unsupported schemas, or rewrite working modules.
 
 ---
 
 ## 1. Project Mission & Identity
 
-- **Product:** RedLab (Version 1.1)
+- **Product:** RedLab (Version 1.1.1)
 - **Concept:** Visual network attack simulation and defense laboratory (like Cisco Packet Tracer, dedicated to computer network security, TCP port scanning, firewall rule filtering, traffic tracing, and attack path analysis).
 - **Core Loop:** Build Network Topology on Canvas → Configure Interfaces, Services & ACLs → Run Network Attack / Port Scan → Inspect Findings & Attack Paths → Remediate Misconfigurations → Rescan (Deterministic Verification).
 - **Hard Constraint:** RedLab is a **local, self-contained educational simulation**.

@@ -1,7 +1,7 @@
 {
   "name": "redlab-desktop",
-  "version": "1.1.0",
-  "description": "RedLab — Visual Cloud Security Simulation Platform (Desktop Edition)",
+  "version": "1.1.1",
+  "description": "RedLab — Network Attack & Defense Simulation Platform (Desktop Edition)",
   "main": "src/main.cjs",
   "author": "RedLab Team",
   "license": "MIT",

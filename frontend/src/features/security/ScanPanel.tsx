@@ -150,7 +150,7 @@ export function ScanPanel() {
               <div>
                 <p className="text-sm font-semibold text-[#F3F5F8]">Evaluating Security Policies</p>
                 <p className="text-xs text-[#9BA5B5] mt-1">
-                  Analyzing architecture graph, firewalls, IAM permissions, and attack surfaces...
+                  Analyzing network topology, firewalls, exposed ports, and attack paths...
                 </p>
               </div>
             </div>
@@ -160,7 +160,7 @@ export function ScanPanel() {
               <div>
                 <p className="text-sm font-semibold text-[#F3F5F8]">No Scan Executed Yet</p>
                 <p className="text-xs text-[#9BA5B5] mt-1 max-w-sm">
-                  Run a security scan to evaluate CIS cloud benchmarks, IAM privilege escalation risks, and potential attack vectors.
+                  Run a network security scan to evaluate open management ports, plaintext protocols, and firewall rule misconfigurations.
                 </p>
               </div>
               <Button
