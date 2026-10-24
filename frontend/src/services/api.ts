@@ -18,24 +18,41 @@ declare global {
   }
 }
 
-const API_BASE =
-  (typeof window !== 'undefined' && window.__REDLAB_API_URL__) ||
-  import.meta.env.VITE_API_URL ||
-  'http://127.0.0.1:8000/api';
+function getApiBase(): string {
+  if (typeof window !== 'undefined') {
+    if (window.__REDLAB_API_URL__) return window.__REDLAB_API_URL__;
+    if (window.location && window.location.origin && window.location.origin.startsWith('http')) {
+      return `${window.location.origin}/api`;
+    }
+  }
+  return import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+}
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${url}`, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    ...options,
-  });
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(error.detail || `Request failed: ${res.status}`);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(`${getApiBase()}${url}`, {
+      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      signal: controller.signal,
+      ...options,
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(error.detail || `Request failed: ${res.status}`);
+    }
+    if (res.status === 204) {
+      return {} as T;
+    }
+    return res.json();
+  } catch (err: unknown) {
+    if ((err as Error)?.name === 'AbortError') {
+      throw new Error('Connection timed out. The RedLab backend is taking longer than expected to respond.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
-  if (res.status === 204) {
-    return {} as T;
-  }
-  return res.json();
 }
 
 export const api = {

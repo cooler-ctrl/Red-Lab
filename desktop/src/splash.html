@@ -97,10 +97,20 @@
       <img src="../assets/icon.png" alt="RedLab" class="logo-img" />
     </div>
     <h1>RedLab</h1>
-    <p>Starting simulation engine (v1.1.1)...</p>
+    <p id="status-text">Starting simulation engine (v1.1.1)...</p>
     <div class="loader">
       <div class="loader-bar"></div>
     </div>
   </div>
+  <script>
+    if (window.redlabDesktop && window.redlabDesktop.onBackendStatus) {
+      window.redlabDesktop.onBackendStatus(function(data) {
+        var el = document.getElementById('status-text');
+        if (el && data && data.status) {
+          el.textContent = data.status;
+        }
+      });
+    }
+  </script>
 </body>
 </html>

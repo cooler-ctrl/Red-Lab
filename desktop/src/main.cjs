@@ -33,20 +33,26 @@ function checkHealth(port) {
       resolve(res.statusCode === 200);
     });
     req.on('error', () => resolve(false));
-    req.setTimeout(1000, () => {
+    req.setTimeout(400, () => {
       req.destroy();
       resolve(false);
     });
   });
 }
 
-// Wait until backend is responsive
-async function waitForBackend(port, timeoutMs = 30000) {
+// Wait until backend is responsive with live progress reporting
+async function waitForBackend(port, timeoutMs = 45000, onProgress) {
   const startTime = Date.now();
+  let count = 0;
   while (Date.now() - startTime < timeoutMs) {
     const isHealthy = await checkHealth(port);
     if (isHealthy) return true;
-    await new Promise((r) => setTimeout(r, 250));
+    count++;
+    if (onProgress && count % 5 === 0) {
+      const elapsedSec = Math.round((Date.now() - startTime) / 1000);
+      onProgress(elapsedSec);
+    }
+    await new Promise((r) => setTimeout(r, 100));
   }
   return false;
 }
@@ -64,14 +70,20 @@ function resolveBackendPath() {
     const candidate2 = path.join(process.resourcesPath, 'backend', 'redlab-backend', binaryName);
     if (fs.existsSync(candidate2)) return { type: 'binary', path: candidate2 };
   } else {
-    // 2. Local desktop dist-backend
+    // 2. In development, prefer direct python script for instant startup if available
+    const scriptPath = path.join(__dirname, '..', '..', 'backend', 'desktop_run.py');
+    if (fs.existsSync(scriptPath)) {
+      return { type: 'python', path: scriptPath };
+    }
+
+    // 3. Local desktop dist-backend
     const local1 = path.join(__dirname, '..', 'dist-backend', 'redlab-backend', binaryName);
     if (fs.existsSync(local1)) return { type: 'binary', path: local1 };
 
     const local2 = path.join(__dirname, '..', 'dist-backend', binaryName);
     if (fs.existsSync(local2)) return { type: 'binary', path: local2 };
 
-    // 3. Backend dist
+    // 4. Backend dist
     const backendDist1 = path.join(__dirname, '..', '..', 'backend', 'dist', 'redlab-backend', binaryName);
     if (fs.existsSync(backendDist1)) return { type: 'binary', path: backendDist1 };
 
@@ -79,7 +91,7 @@ function resolveBackendPath() {
     if (fs.existsSync(backendDist2)) return { type: 'binary', path: backendDist2 };
   }
 
-  // 4. Source fallback using python3
+  // Fallback using python3
   const scriptPath = path.join(__dirname, '..', '..', 'backend', 'desktop_run.py');
   if (fs.existsSync(scriptPath)) {
     return { type: 'python', path: scriptPath };
@@ -125,14 +137,19 @@ function startBackend(port) {
   console.log(`[RedLab Desktop] Launching backend (${backend.type}): ${backend.path}`);
 
   let proc;
+  const launchArgs = ['--port', String(port), '--data-dir', dataDir];
+  if (frontendDist) {
+    launchArgs.push('--frontend-dist', frontendDist);
+  }
+
   if (backend.type === 'binary') {
-    proc = spawn(backend.path, ['--port', String(port), '--data-dir', dataDir], {
+    proc = spawn(backend.path, launchArgs, {
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
   } else {
     const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-    proc = spawn(pythonCmd, [backend.path, '--port', String(port), '--data-dir', dataDir], {
+    proc = spawn(pythonCmd, [backend.path, ...launchArgs], {
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -324,8 +341,15 @@ async function initApp() {
   // Launch backend
   backendProcess = startBackend(activePort);
 
-  // Wait for health check
-  const ready = await waitForBackend(activePort, 25000);
+  // Wait for health check with live progress updates sent to splash screen
+  const ready = await waitForBackend(activePort, 45000, (elapsedSec) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('backend-status', {
+        status: `Starting simulation engine (${elapsedSec}s)...`,
+      });
+    }
+  });
+
   if (ready) {
     console.log(`[RedLab Desktop] Backend is healthy! Loading http://127.0.0.1:${activePort}/`);
     mainWindow.loadURL(`http://127.0.0.1:${activePort}/`);

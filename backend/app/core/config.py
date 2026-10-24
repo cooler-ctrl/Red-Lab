@@ -43,7 +43,7 @@ def get_frontend_dist() -> Path | None:
 class Settings:
     APP_NAME: str = "RedLab"
     VERSION: str = "1.1.1"
-    DEBUG: bool = os.environ.get("REDLAB_DEBUG", "True").lower() in ("true", "1")
+    DEBUG: bool = os.environ.get("REDLAB_DEBUG", "False").lower() in ("true", "1")
     DATABASE_URL: str = get_default_database_url()
     FRONTEND_DIST: Path | None = get_frontend_dist()
     CORS_ORIGINS: list[str] = [
