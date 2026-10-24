@@ -178,4 +178,26 @@ describe('EditorStore', () => {
     expect(targetFindings).toHaveLength(1);
     expect(otherFindings).toHaveLength(0);
   });
+
+  it('switches appMode and updates edge styles', () => {
+    useEditorStore.setState({
+      appMode: 'attack',
+      edges: [
+        {
+          id: 'e1',
+          source: 'n1',
+          target: 'n2',
+          style: { stroke: '#FF3B4E', strokeWidth: 2 },
+        },
+      ],
+    });
+
+    useEditorStore.getState().setAppMode('defend');
+    expect(useEditorStore.getState().appMode).toBe('defend');
+    expect(useEditorStore.getState().edges[0].style?.stroke).toBe('#3B82F6');
+
+    useEditorStore.getState().setAppMode('attack');
+    expect(useEditorStore.getState().appMode).toBe('attack');
+    expect(useEditorStore.getState().edges[0].style?.stroke).toBe('#FF3B4E');
+  });
 });

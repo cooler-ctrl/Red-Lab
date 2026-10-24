@@ -18,10 +18,19 @@ from ..schemas.lab import (
     AssessmentRequest,
     AssessmentResponse,
     TopologyValidationResult,
+    AttackExecutionRequest,
+    AttackExecutionResponse,
+    VerifyDefenseRequest,
 )
 from ..services import lab_service
 from ..network_engine.topology import validate_topology
-from ..network_engine.simulator import simulate_topology, simulate_ping, simulate_port_scan
+from ..network_engine.simulator import (
+    simulate_topology,
+    simulate_ping,
+    simulate_port_scan,
+    execute_attack_scenario,
+    verify_defense,
+)
 from ..scenarios.definitions import get_all_scenarios, get_scenario, assess_scenario
 
 router = APIRouter(prefix="/api")
@@ -228,6 +237,112 @@ def run_port_scan(
 
     events = simulate_port_scan(graph, run_id, source_id, dest_id, ports)
     return [e.model_dump(mode="json") for e in events]
+
+
+# ---------------------------------------------------------------------------
+# Attack Mode & Defend Mode Execution
+# ---------------------------------------------------------------------------
+
+@router.post("/labs/{lab_id}/attack", response_model=AttackExecutionResponse)
+def run_attack(
+    lab_id: str,
+    data: AttackExecutionRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Execute a controlled attack scenario against an authorized lab target.
+    Enforces mode restrictions: Attacks can only be launched in Attack Mode.
+    """
+    lab = lab_service.get_lab(db, lab_id)
+    if not lab:
+        raise HTTPException(status_code=404, detail="Lab not found")
+
+    if data.app_mode == "defend":
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Permission Denied: Attack operations cannot be launched while in Defend Mode. "
+                "Switch to Attack Mode (Red Team) or use the 'Verify Defense' workflow."
+            ),
+        )
+
+    graph_dict = lab.graph_data or {"nodes": [], "edges": []}
+    graph = GraphData(**graph_dict)
+
+    # Validate target exists in this specific lab
+    target_ids = {n.id for n in graph.nodes}
+    if data.target_id not in target_ids:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Target '{data.target_id}' does not belong to this authorized lab environment.",
+        )
+
+    try:
+        response = execute_attack_scenario(graph, data)
+        # Store attack execution as a lab run record
+        run = lab_service.create_run(db, lab_id, mode="simulator", scenario_id=data.scenario_id)
+        lab_service.update_run(
+            db,
+            run,
+            status="completed",
+            ended_at=datetime.datetime.now(datetime.UTC),
+            events=[e.model_dump(mode="json") for e in response.events],
+            result_summary={
+                "outcome": response.outcome,
+                "target_id": response.target_id,
+                "evidence": response.evidence,
+                "takeaway": response.educational_takeaway,
+            },
+        )
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/labs/{lab_id}/verify-defense", response_model=AttackExecutionResponse)
+def run_verify_defense(
+    lab_id: str,
+    data: VerifyDefenseRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Verify defensive controls by rerunning an approved attack scenario test against the lab.
+    Returns a side-by-side Before/After comparison.
+    """
+    lab = lab_service.get_lab(db, lab_id)
+    if not lab:
+        raise HTTPException(status_code=404, detail="Lab not found")
+
+    graph_dict = lab.graph_data or {"nodes": [], "edges": []}
+    graph = GraphData(**graph_dict)
+
+    target_ids = {n.id for n in graph.nodes}
+    if data.target_id not in target_ids:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Target '{data.target_id}' does not belong to this authorized lab environment.",
+        )
+
+    try:
+        response = verify_defense(graph, data)
+        # Store verification run record
+        run = lab_service.create_run(db, lab_id, mode="simulator", scenario_id=data.scenario_id)
+        lab_service.update_run(
+            db,
+            run,
+            status="completed",
+            ended_at=datetime.datetime.now(datetime.UTC),
+            events=[e.model_dump(mode="json") for e in response.events],
+            result_summary={
+                "outcome": response.outcome,
+                "defense_effective": response.comparison.defense_effective if response.comparison else False,
+                "comparison": response.comparison.model_dump(mode="json") if response.comparison else None,
+            },
+        )
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 
 # ---------------------------------------------------------------------------

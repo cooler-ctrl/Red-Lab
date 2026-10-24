@@ -275,6 +275,21 @@ def assess_scenario(scenario_id: str, graph: GraphData, answers: dict) -> dict:
     elif scenario_id == "network_troubleshoot":
         _assess_network_troubleshoot(graph, scenario, objectives_met, objectives_failed, explanations)
 
+    elif scenario_id == "attack_port_scan":
+        _assess_attack_port_scan(graph, scenario, objectives_met, objectives_failed, explanations)
+
+    elif scenario_id == "auth_brute_force":
+        _assess_auth_brute_force(graph, scenario, objectives_met, objectives_failed, explanations)
+
+    elif scenario_id == "traffic_analysis":
+        _assess_traffic_analysis(graph, scenario, objectives_met, objectives_failed, explanations)
+
+    elif scenario_id == "web_security_injection":
+        _assess_web_security(graph, scenario, objectives_met, objectives_failed, explanations)
+
+    elif scenario_id == "firewall_segmentation":
+        _assess_segmentation(graph, scenario, objectives_met, objectives_failed, explanations)
+
     required_objectives = [o["id"] for o in scenario["objectives"] if o["required"]]
     all_required_met = all(oid in objectives_met for oid in required_objectives)
 
@@ -434,3 +449,290 @@ def _assess_network_troubleshoot(graph, scenario, met, failed, explanations):
         failed.append("obj_verify")
         explanations.append(f"✗ obj_fix: Connectivity not restored. Hint: {r.reason}")
         explanations.append(f"✗ obj_verify: {pcs[0].label} cannot reach {servers[0].label}.")
+
+
+# ---------------------------------------------------------------------------
+# Attack & Defend Scenarios (v1.1)
+# ---------------------------------------------------------------------------
+
+register({
+    "id": "attack_port_scan",
+    "title": "Network Reconnaissance and Port Scanning",
+    "category": "cybersecurity",
+    "difficulty": "beginner",
+    "description": (
+        "Perform reconnaissance using a TCP port scan to discover listening services "
+        "on target hosts, then switch to Defend Mode to implement firewall rule filtering."
+    ),
+    "objectives": [
+        {"id": "obj_discover_ports", "description": "Execute a TCP port scan discovering open host services.", "required": True},
+        {"id": "obj_remediate_firewall", "description": "Configure firewall default-deny or ACL rule to filter sensitive ports.", "required": True},
+    ],
+    "supported_modes": ["simulator"],
+    "estimated_minutes": 15,
+    "tags": ["reconnaissance", "port-scan", "firewall", "defend"],
+    "initial_topology": {
+        "nodes": [
+            {"id": "attacker-1", "type": "pc", "position": {"x": 100, "y": 200}, "label": "Attacker Workstation",
+             "config": {"name": "Attacker Workstation", "interfaces": [{"id": "eth0", "name": "eth0", "ip_address": "192.168.1.100", "cidr_prefix": "24", "enabled": True}], "default_gateway": "192.168.1.1"}},
+            {"id": "fw-1", "type": "firewall", "position": {"x": 300, "y": 200}, "label": "Edge Firewall",
+             "config": {"name": "Edge Firewall", "ip_address": "192.168.1.1", "cidr_prefix": "24", "default_inbound_action": "allow", "inbound_rules": []}},
+            {"id": "srv-1", "type": "server", "position": {"x": 500, "y": 200}, "label": "Production Server",
+             "config": {"name": "Production Server", "ip_address": "192.168.1.50", "cidr_prefix": "24", "default_gateway": "192.168.1.1",
+                        "services": [{"name": "HTTP", "port": 80, "protocol": "tcp", "enabled": True},
+                                     {"name": "SSH", "port": 22, "protocol": "tcp", "enabled": True}]}},
+        ],
+        "edges": [
+            {"id": "e1", "source": "attacker-1", "target": "fw-1", "relationship_type": "connects", "metadata": {}},
+            {"id": "e2", "source": "fw-1", "target": "srv-1", "relationship_type": "connects", "metadata": {}},
+        ],
+    },
+})
+
+register({
+    "id": "auth_brute_force",
+    "title": "Authentication Security and Brute-Force Defense",
+    "category": "cybersecurity",
+    "difficulty": "intermediate",
+    "description": (
+        "Simulate an automated dictionary brute-force attack against an administrative SSH service, "
+        "observe compromised credentials, and remediate using rate-limiting, strong authentication, or IPS."
+    ),
+    "objectives": [
+        {"id": "obj_detect_bruteforce", "description": "Observe and diagnose credential brute-force attack against server.", "required": True},
+        {"id": "obj_enforce_defense", "description": "Apply host fail2ban, strong credentials, or firewall drop to mitigate attack.", "required": True},
+    ],
+    "supported_modes": ["simulator"],
+    "estimated_minutes": 20,
+    "tags": ["brute-force", "ssh", "fail2ban", "passwords", "defense"],
+    "initial_topology": {
+        "nodes": [
+            {"id": "attacker-pc", "type": "pc", "position": {"x": 100, "y": 200}, "label": "Attacker",
+             "config": {"name": "Attacker", "interfaces": [{"id": "eth0", "name": "eth0", "ip_address": "10.0.0.100", "cidr_prefix": "24", "enabled": True}], "default_gateway": "10.0.0.1"}},
+            {"id": "router-1", "type": "router", "position": {"x": 300, "y": 200}, "label": "Gateway Router",
+             "config": {"name": "Gateway Router", "interfaces": [
+                 {"id": "eth0", "name": "eth0", "ip_address": "10.0.0.1", "cidr_prefix": "24", "enabled": True},
+                 {"id": "eth1", "name": "eth1", "ip_address": "192.168.10.1", "cidr_prefix": "24", "enabled": True},
+             ], "nat_enabled": True}},
+            {"id": "srv-admin", "type": "server", "position": {"x": 500, "y": 200}, "label": "Admin Server",
+             "config": {"name": "Admin Server", "ip_address": "192.168.10.50", "cidr_prefix": "24", "default_gateway": "192.168.10.1",
+                        "allow_weak_passwords": True, "services": [{"name": "SSH", "port": 22, "protocol": "tcp", "enabled": True}]}},
+        ],
+        "edges": [
+            {"id": "e1", "source": "attacker-pc", "target": "router-1", "relationship_type": "connects", "metadata": {}},
+            {"id": "e2", "source": "router-1", "target": "srv-admin", "relationship_type": "connects", "metadata": {}},
+        ],
+    },
+})
+
+register({
+    "id": "traffic_analysis",
+    "title": "Traffic Analysis and Packet Inspection",
+    "category": "networking",
+    "difficulty": "beginner",
+    "description": (
+        "Inspect packet-level traces between hosts, demonstrate cleartext token leakage over unencrypted HTTP, "
+        "and upgrade to encrypted TLS/HTTPS."
+    ),
+    "objectives": [
+        {"id": "obj_packet_capture", "description": "Run traffic capture and inspect TCP handshake and application protocols.", "required": True},
+        {"id": "obj_secure_protocol", "description": "Upgrade server to encrypted HTTPS (port 443) to prevent traffic inspection.", "required": True},
+    ],
+    "supported_modes": ["simulator"],
+    "estimated_minutes": 15,
+    "tags": ["traffic-analysis", "packets", "tls", "wireshark", "http"],
+    "initial_topology": {
+        "nodes": [
+            {"id": "client-1", "type": "pc", "position": {"x": 100, "y": 200}, "label": "Client PC",
+             "config": {"name": "Client PC", "interfaces": [{"id": "eth0", "name": "eth0", "ip_address": "192.168.1.20", "cidr_prefix": "24", "enabled": True}], "default_gateway": "192.168.1.1"}},
+            {"id": "sw-core", "type": "switch", "position": {"x": 300, "y": 200}, "label": "Core Switch",
+             "config": {"name": "Core Switch", "ports": [], "default_vlan": 1}},
+            {"id": "web-srv", "type": "web_server", "position": {"x": 500, "y": 200}, "label": "Web Server",
+             "config": {"name": "Web Server", "ip_address": "192.168.1.80", "cidr_prefix": "24", "default_gateway": "192.168.1.1",
+                        "services": [{"name": "HTTP", "port": 80, "protocol": "tcp", "enabled": True}]}},
+        ],
+        "edges": [
+            {"id": "e1", "source": "client-1", "target": "sw-core", "relationship_type": "connects", "metadata": {}},
+            {"id": "e2", "source": "sw-core", "target": "web-srv", "relationship_type": "connects", "metadata": {}},
+        ],
+    },
+})
+
+register({
+    "id": "web_security_injection",
+    "title": "Web Application Security and SQL Injection",
+    "category": "cybersecurity",
+    "difficulty": "intermediate",
+    "description": (
+        "Exploit an unparameterized database query vulnerability in a web application, "
+        "observe authentication bypass, and remediate using Web Application Firewall (WAF) or input sanitization."
+    ),
+    "objectives": [
+        {"id": "obj_detect_sqli", "description": "Launch SQL injection exploit and observe credential leak.", "required": True},
+        {"id": "obj_apply_waf", "description": "Enable WAF protection or input sanitization to block malicious SQL payloads.", "required": True},
+    ],
+    "supported_modes": ["simulator"],
+    "estimated_minutes": 20,
+    "tags": ["web-security", "sqli", "owasp", "waf", "xss"],
+    "initial_topology": {
+        "nodes": [
+            {"id": "attacker-wan", "type": "external_network", "position": {"x": 80, "y": 180}, "label": "Internet WAN",
+             "config": {"name": "Internet WAN", "cidr_block": "0.0.0.0/0"}},
+            {"id": "waf-fw", "type": "firewall", "position": {"x": 260, "y": 180}, "label": "Perimeter Firewall",
+             "config": {"name": "Perimeter Firewall", "ip_address": "10.0.1.1", "cidr_prefix": "24", "default_inbound_action": "allow"}},
+            {"id": "app-server", "type": "web_server", "position": {"x": 460, "y": 180}, "label": "Web App Server",
+             "config": {"name": "Web App Server", "ip_address": "10.0.1.50", "cidr_prefix": "24", "default_gateway": "10.0.1.1",
+                        "waf_enabled": False, "services": [{"name": "HTTP", "port": 80, "protocol": "tcp", "enabled": True}]}},
+        ],
+        "edges": [
+            {"id": "e1", "source": "attacker-wan", "target": "waf-fw", "relationship_type": "connects", "metadata": {}},
+            {"id": "e2", "source": "waf-fw", "target": "app-server", "relationship_type": "connects", "metadata": {}},
+        ],
+    },
+})
+
+register({
+    "id": "firewall_segmentation",
+    "title": "Firewall and Network Segmentation Testing",
+    "category": "networking",
+    "difficulty": "intermediate",
+    "description": (
+        "Test lateral movement reachability between an infected user workstation and a critical internal database server. "
+        "Enforce strict firewall ACL segmentation between network zones."
+    ),
+    "objectives": [
+        {"id": "obj_isolate_segments", "description": "Configure firewall rules to restrict lateral movement to database ports.", "required": True},
+        {"id": "obj_verify_isolation", "description": "Verify that unauthorized lateral connections are blocked while legitimate web traffic passes.", "required": True},
+    ],
+    "supported_modes": ["simulator"],
+    "estimated_minutes": 25,
+    "tags": ["segmentation", "lateral-movement", "firewall", "zero-trust"],
+    "initial_topology": {
+        "nodes": [
+            {"id": "workstation-1", "type": "pc", "position": {"x": 100, "y": 120}, "label": "User Workstation",
+             "config": {"name": "User Workstation", "interfaces": [{"id": "eth0", "name": "eth0", "ip_address": "192.168.10.15", "cidr_prefix": "24", "enabled": True}], "default_gateway": "192.168.10.1"}},
+            {"id": "fw-zone", "type": "firewall", "position": {"x": 300, "y": 180}, "label": "Zone Firewall",
+             "config": {"name": "Zone Firewall", "ip_address": "192.168.10.1", "cidr_prefix": "24", "default_inbound_action": "allow"}},
+            {"id": "db-server", "type": "server", "position": {"x": 500, "y": 240}, "label": "Internal Database",
+             "config": {"name": "Internal Database", "ip_address": "192.168.20.100", "cidr_prefix": "24", "default_gateway": "192.168.20.1",
+                        "services": [{"name": "MySQL", "port": 3306, "protocol": "tcp", "enabled": True}]}},
+        ],
+        "edges": [
+            {"id": "e1", "source": "workstation-1", "target": "fw-zone", "relationship_type": "connects", "metadata": {}},
+            {"id": "e2", "source": "fw-zone", "target": "db-server", "relationship_type": "connects", "metadata": {}},
+        ],
+    },
+})
+
+
+# ---------------------------------------------------------------------------
+# Assessment Handlers for Attack Scenarios
+# ---------------------------------------------------------------------------
+
+def _assess_attack_port_scan(graph, scenario, met, failed, explanations):
+    met.append("obj_discover_ports")
+    explanations.append("✓ obj_discover_ports: Port scan reconnaissance completed.")
+
+    # Check if firewall has a deny rule or default deny
+    firewalls = _get_nodes_by_type(graph, "firewall")
+    remediated = False
+    for fw in firewalls:
+        if fw.config.get("default_inbound_action") == "deny":
+            remediated = True
+            break
+        for rule in fw.config.get("inbound_rules", []):
+            if isinstance(rule, dict) and rule.get("action") == "deny":
+                remediated = True
+                break
+
+    if remediated:
+        met.append("obj_remediate_firewall")
+        explanations.append("✓ obj_remediate_firewall: Firewall filtering policy configured.")
+    else:
+        failed.append("obj_remediate_firewall")
+        explanations.append("✗ obj_remediate_firewall: Firewall still permits unrestricted traffic. Add a DENY rule or set default action to deny.")
+
+
+def _assess_auth_brute_force(graph, scenario, met, failed, explanations):
+    met.append("obj_detect_bruteforce")
+    explanations.append("✓ obj_detect_bruteforce: Authentication attack telemetry captured.")
+
+    servers = _get_nodes_by_type(graph, "server") + _get_nodes_by_type(graph, "linux_server")
+    protected = False
+    for srv in servers:
+        cfg = srv.config
+        if cfg.get("fail2ban_enabled") or not cfg.get("allow_weak_passwords", True) or cfg.get("rate_limiting"):
+            protected = True
+            break
+
+    if protected:
+        met.append("obj_enforce_defense")
+        explanations.append("✓ obj_enforce_defense: Target protected with Fail2ban / strong password policy.")
+    else:
+        failed.append("obj_enforce_defense")
+        explanations.append("✗ obj_enforce_defense: Server still has weak passwords or lacks rate limiting.")
+
+
+def _assess_traffic_analysis(graph, scenario, met, failed, explanations):
+    met.append("obj_packet_capture")
+    explanations.append("✓ obj_packet_capture: Packet traces and protocol telemetry captured.")
+
+    web_servers = _get_nodes_by_type(graph, "web_server") + _get_nodes_by_type(graph, "server")
+    has_tls = False
+    for srv in web_servers:
+        services = srv.config.get("services", [])
+        if any(s.get("port") == 443 for s in services if isinstance(s, dict)):
+            has_tls = True
+            break
+
+    if has_tls:
+        met.append("obj_secure_protocol")
+        explanations.append("✓ obj_secure_protocol: Encrypted HTTPS (port 443) service deployed.")
+    else:
+        failed.append("obj_secure_protocol")
+        explanations.append("✗ obj_secure_protocol: Server still uses unencrypted HTTP. Add HTTPS on port 443.")
+
+
+def _assess_web_security(graph, scenario, met, failed, explanations):
+    met.append("obj_detect_sqli")
+    explanations.append("✓ obj_detect_sqli: SQL injection exploit executed against web application.")
+
+    web_servers = _get_nodes_by_type(graph, "web_server") + _get_nodes_by_type(graph, "server")
+    waf_active = False
+    for srv in web_servers:
+        cfg = srv.config
+        if cfg.get("waf_enabled") or cfg.get("input_sanitization"):
+            waf_active = True
+            break
+
+    if waf_active:
+        met.append("obj_apply_waf")
+        explanations.append("✓ obj_apply_waf: Web Application Firewall / input validation active.")
+    else:
+        failed.append("obj_apply_waf")
+        explanations.append("✗ obj_apply_waf: WAF protection not enabled on web server.")
+
+
+def _assess_segmentation(graph, scenario, met, failed, explanations):
+    firewalls = _get_nodes_by_type(graph, "firewall")
+    pcs = _get_nodes_by_type(graph, "pc")
+    servers = _get_nodes_by_type(graph, "server")
+
+    if not pcs or not servers:
+        failed.append("obj_isolate_segments")
+        failed.append("obj_verify_isolation")
+        explanations.append("✗ Missing PC or Database Server.")
+        return
+
+    # Evaluate connectivity between PC and Server on DB port 3306
+    reach = evaluate_connectivity(graph, pcs[0].id, servers[0].id, protocol="tcp", port=3306)
+    if not reach.reachable and reach.blocked_by:
+        met.append("obj_isolate_segments")
+        met.append("obj_verify_isolation")
+        explanations.append(f"✓ obj_isolate_segments: Lateral movement to DB blocked by '{reach.blocked_by}'.")
+        explanations.append(f"✓ obj_verify_isolation: Network segmentation successfully enforced.")
+    else:
+        failed.append("obj_isolate_segments")
+        failed.append("obj_verify_isolation")
+        explanations.append(f"✗ obj_isolate_segments: Workstation can directly connect to Database port 3306. Add firewall deny rule.")
+

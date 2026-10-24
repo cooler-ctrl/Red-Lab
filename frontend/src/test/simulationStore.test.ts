@@ -1,15 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useSimulationStore } from '../stores/simulationStore';
 import { api } from '../services/api';
+import type { AttackExecutionResponse, BeforeAfterComparison } from '../types';
 
 vi.mock('../services/api', () => ({
   api: {
     validateTopology: vi.fn(),
     startRun: vi.fn(),
     stopRun: vi.fn(),
-    getRunEvents: vi.fn(),
     ping: vi.fn(),
     portScan: vi.fn(),
+    executeAttack: vi.fn(),
+    verifyDefense: vi.fn(),
   },
 }));
 
@@ -26,6 +28,10 @@ describe('SimulationStore', () => {
       pingEvents: [],
       bottomTab: 'security',
       panelOpen: false,
+      attackLoading: false,
+      attackResponse: null,
+      verifyLoading: false,
+      comparisonResult: null,
     });
   });
 
@@ -159,5 +165,78 @@ describe('SimulationStore', () => {
     expect(useSimulationStore.getState().bottomTab).toBe('portscan');
     expect(useSimulationStore.getState().panelOpen).toBe(true);
     expect(useSimulationStore.getState().portScanLoading).toBe(false);
+  });
+
+  it('executes attack scenario and stores response', async () => {
+    const mockAttackRes: AttackExecutionResponse = {
+      run_id: 'atk-run-1',
+      scenario_id: 'attack_port_scan',
+      scenario_title: 'Port Scan Recon',
+      target_id: 'srv1',
+      target_name: 'Target-Server',
+      status: 'completed',
+      outcome: 'compromised',
+      evidence: { open_ports: [80, 22] },
+      events: [],
+      educational_takeaway: 'Open ports discovered',
+      remediation_hint: 'Configure firewall ACL to drop inbound SYN',
+    };
+    vi.mocked(api.executeAttack).mockResolvedValueOnce(mockAttackRes);
+
+    const res = await useSimulationStore.getState().executeAttack('lab-123', {
+      scenario_id: 'attack_port_scan',
+      target_id: 'srv1',
+      app_mode: 'attack',
+    });
+
+    expect(res.outcome).toBe('compromised');
+    expect(useSimulationStore.getState().attackResponse).toEqual(mockAttackRes);
+    expect(useSimulationStore.getState().bottomTab).toBe('attack');
+    expect(useSimulationStore.getState().panelOpen).toBe(true);
+    expect(useSimulationStore.getState().attackLoading).toBe(false);
+  });
+
+  it('runs verify defense and stores before/after comparison', async () => {
+    const mockComparison: BeforeAfterComparison = {
+      scenario_id: 'attack_port_scan',
+      target_id: 'srv1',
+      target_name: 'Target-Server',
+      defense_applied: 'Firewall ACL default-deny',
+      before_status: 'compromised',
+      before_summary: 'Port 80/TCP OPEN',
+      before_events_count: 5,
+      after_status: 'blocked',
+      after_summary: 'Traffic filtered by firewall rule',
+      after_events_count: 3,
+      defense_effective: true,
+      explanation: 'Attack successfully blocked by firewall rule',
+    };
+    const mockVerifyRes: AttackExecutionResponse = {
+      run_id: 'verify-run-1',
+      scenario_id: 'attack_port_scan',
+      scenario_title: 'Port Scan Recon',
+      target_id: 'srv1',
+      target_name: 'Target-Server',
+      status: 'completed',
+      outcome: 'blocked',
+      events: [],
+      evidence: {},
+      educational_takeaway: 'Firewall rules successfully prevent unauthorized access',
+      remediation_hint: 'Verify all interfaces are protected',
+      comparison: mockComparison,
+    };
+    vi.mocked(api.verifyDefense).mockResolvedValueOnce(mockVerifyRes);
+
+    const res = await useSimulationStore.getState().runVerifyDefense('lab-123', {
+      scenario_id: 'attack_port_scan',
+      target_id: 'srv1',
+      applied_defense: 'Firewall default-deny',
+    });
+
+    expect(res.comparison?.defense_effective).toBe(true);
+    expect(useSimulationStore.getState().comparisonResult).toEqual(mockComparison);
+    expect(useSimulationStore.getState().bottomTab).toBe('defense_verify');
+    expect(useSimulationStore.getState().panelOpen).toBe(true);
+    expect(useSimulationStore.getState().verifyLoading).toBe(false);
   });
 });

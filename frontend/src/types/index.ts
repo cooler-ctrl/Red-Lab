@@ -1,11 +1,19 @@
-// Resource types — RedLab Network Attack Simulation Platform
+// Resource types — RedLab Network Attack & Defense Simulation Platform
 export type ResourceType =
   | 'pc'
   | 'router'
   | 'switch'
   | 'server'
   | 'firewall'
-  | 'external_network';
+  | 'external_network'
+  | 'linux_server'
+  | 'web_server'
+  | 'dns_server'
+  | 'layer3_switch'
+  | 'ids_ips'
+  | 'endpoint';
+
+export type AppMode = 'attack' | 'defend';
 
 // ---- Network device config types ----
 
@@ -322,3 +330,53 @@ export interface ScenarioAssessment {
   explanation: string;
   completed_at: string;
 }
+
+// ---- RedLab 1.1 Attack & Defend Mode ----
+
+export interface AttackExecutionRequest {
+  scenario_id: string;
+  target_id: string;
+  attacker_id?: string;
+  parameters?: Record<string, unknown>;
+  app_mode?: AppMode;
+}
+
+export interface VerifyDefenseRequest {
+  scenario_id: string;
+  target_id: string;
+  attacker_id?: string;
+  applied_defense?: string;
+  parameters?: Record<string, unknown>;
+}
+
+export interface BeforeAfterComparison {
+  scenario_id: string;
+  target_id: string;
+  target_name: string;
+  defense_applied: string;
+  before_status: string;
+  before_summary: string;
+  before_events_count: number;
+  after_status: string;
+  after_summary: string;
+  after_events_count: number;
+  defense_effective: boolean;
+  explanation: string;
+}
+
+export interface AttackExecutionResponse {
+  run_id: string;
+  scenario_id: string;
+  scenario_title: string;
+  target_id: string;
+  target_name: string;
+  attacker_id?: string;
+  status: string;
+  outcome: 'compromised' | 'blocked' | 'discovered' | 'detected' | string;
+  events: NetworkEvent[];
+  evidence: Record<string, unknown>;
+  educational_takeaway: string;
+  remediation_hint: string;
+  comparison?: BeforeAfterComparison | null;
+}
+

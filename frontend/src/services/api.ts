@@ -7,6 +7,9 @@ import type {
   Scenario,
   ScenarioAssessment,
   ExecutionMode,
+  AttackExecutionRequest,
+  AttackExecutionResponse,
+  VerifyDefenseRequest,
 } from '../types';
 
 declare global {
@@ -88,6 +91,18 @@ export const api = {
     request<ScenarioAssessment>(`/runs/${runId}/assess`, {
       method: 'POST',
       body: JSON.stringify({ answers: answers || {} }),
+    }),
+
+  // RedLab 1.1 Attack & Defend Mode
+  executeAttack: (labId: string, data: AttackExecutionRequest) =>
+    request<AttackExecutionResponse>(`/labs/${labId}/attack`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  verifyDefense: (labId: string, data: VerifyDefenseRequest) =>
+    request<AttackExecutionResponse>(`/labs/${labId}/verify-defense`, {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
 };
 

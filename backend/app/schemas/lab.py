@@ -8,7 +8,19 @@ from pydantic import BaseModel, ConfigDict, Field
 
 VALID_RESOURCE_TYPES = {
     # Network devices (RedLab Network Attack Simulation)
-    "pc", "router", "switch", "server", "firewall", "external_network",
+    "pc",
+    "router",
+    "switch",
+    "server",
+    "firewall",
+    "external_network",
+    # Extended devices
+    "linux_server",
+    "web_server",
+    "dns_server",
+    "layer3_switch",
+    "ids_ips",
+    "endpoint",
 }
 
 
@@ -212,3 +224,53 @@ class AssessmentResponse(BaseModel):
     passed: bool
     explanation: str
     completed_at: datetime.datetime
+
+
+# ---------- RedLab 1.1 Attack & Defend Mode ----------
+
+class AttackExecutionRequest(BaseModel):
+    scenario_id: str
+    target_id: str
+    attacker_id: str | None = None
+    parameters: dict = Field(default_factory=dict)
+    app_mode: str = "attack"  # "attack" | "defend"
+
+
+class VerifyDefenseRequest(BaseModel):
+    scenario_id: str
+    target_id: str
+    attacker_id: str | None = None
+    applied_defense: str = ""
+    parameters: dict = Field(default_factory=dict)
+
+
+class BeforeAfterComparison(BaseModel):
+    scenario_id: str
+    target_id: str
+    target_name: str
+    defense_applied: str
+    before_status: str  # "vulnerable" | "open" | "compromised"
+    before_summary: str
+    before_events_count: int
+    after_status: str   # "blocked" | "filtered" | "secure"
+    after_summary: str
+    after_events_count: int
+    defense_effective: bool
+    explanation: str
+
+
+class AttackExecutionResponse(BaseModel):
+    run_id: str
+    scenario_id: str
+    scenario_title: str
+    target_id: str
+    target_name: str
+    attacker_id: str | None = None
+    status: str  # "completed" | "failed" | "blocked"
+    outcome: str # "compromised" | "blocked" | "discovered" | "detected"
+    events: list[NetworkEvent] = Field(default_factory=list)
+    evidence: dict = Field(default_factory=dict)
+    educational_takeaway: str
+    remediation_hint: str
+    comparison: BeforeAfterComparison | None = None
+

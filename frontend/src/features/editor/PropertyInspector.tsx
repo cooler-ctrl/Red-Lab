@@ -1,4 +1,4 @@
-import { AlertTriangle, Trash2, X, Plus } from 'lucide-react';
+import { AlertTriangle, Trash2, X, Plus, Shield, Lock, ShieldCheck } from 'lucide-react';
 import { useEditorStore, type ResourceNodeData } from '../../stores/editorStore';
 import type { ResourceType } from '../../types';
 
@@ -13,6 +13,7 @@ export function PropertyInspector({ collapsed = false }: PropertyInspectorProps)
   const updateNodeConfig = useEditorStore((s) => s.updateNodeConfig);
   const deleteNode = useEditorStore((s) => s.deleteNode);
   const getNodeFindings = useEditorStore((s) => s.getNodeFindings);
+  const appMode = useEditorStore((s) => s.appMode);
 
   if (collapsed || !selectedNodeId) return null;
 
@@ -24,6 +25,11 @@ export function PropertyInspector({ collapsed = false }: PropertyInspectorProps)
   const config = (nodeData.config || {}) as Record<string, any>;
   const findings = getNodeFindings(selectedNodeId);
 
+  const isDefensiveResource =
+    resourceType === 'firewall' ||
+    resourceType === 'ids_ips' ||
+    resourceType === 'web_server';
+
   const handleFieldChange = (field: string, value: any) => {
     updateNodeConfig(selectedNodeId, { ...config, [field]: value });
   };
@@ -33,7 +39,11 @@ export function PropertyInspector({ collapsed = false }: PropertyInspectorProps)
       {/* Header */}
       <div className="p-3 border-b border-[#293140] flex items-center justify-between">
         <div>
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-[#FF3B4E]">
+          <span
+            className={`text-[10px] font-semibold uppercase tracking-wider ${
+              appMode === 'attack' ? 'text-[#FF3B4E]' : 'text-[#3B82F6]'
+            }`}
+          >
             {resourceType.replace('_', ' ')} Inspector
           </span>
           <h3 className="text-sm font-semibold text-[#F3F5F8] truncate max-w-[200px]">
@@ -48,6 +58,32 @@ export function PropertyInspector({ collapsed = false }: PropertyInspectorProps)
           <X size={16} />
         </button>
       </div>
+
+      {/* Mode notice banner for defensive resources */}
+      {appMode === 'attack' && isDefensiveResource && (
+        <div className="p-2.5 bg-[#FF3B4E]/10 border-b border-[#FF3B4E]/30 flex items-start gap-2">
+          <Lock size={15} className="text-[#FF3B4E] mt-0.5 flex-shrink-0" />
+          <div className="text-xs">
+            <span className="font-semibold text-[#FF3B4E]">Defensive Policy Locked</span>
+            <p className="text-[11px] text-[#9BA5B5] mt-0.5">
+              Switch to <strong className="text-blue-400">DEFEND MODE</strong> on the top toolbar to modify firewall rules, WAF, or IPS protections.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Defend Mode active notice */}
+      {appMode === 'defend' && isDefensiveResource && (
+        <div className="p-2.5 bg-[#3B82F6]/10 border-b border-[#3B82F6]/30 flex items-start gap-2">
+          <ShieldCheck size={15} className="text-[#3B82F6] mt-0.5 flex-shrink-0" />
+          <div className="text-xs">
+            <span className="font-semibold text-[#3B82F6]">Defensive Configuration Active</span>
+            <p className="text-[11px] text-[#9BA5B5] mt-0.5">
+              Apply access rules or filters, then click <strong>Verify Defense</strong> in the bottom panel.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Security Findings alert if any */}
       {findings.length > 0 && (
@@ -499,6 +535,277 @@ export function PropertyInspector({ collapsed = false }: PropertyInspectorProps)
             </div>
             <div className="text-[11px] text-[#9BA5B5] bg-[#171C26] p-2.5 rounded border border-[#293140]">
               Represents untrusted external networks (e.g. Attacker network, Internet). Connect to edge interfaces.
+            </div>
+          </div>
+        )}
+
+        {/* Linux Server Config */}
+        {resourceType === 'linux_server' && (
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-medium text-[#9BA5B5] block mb-1">IP Address (eth0)</label>
+              <input
+                type="text"
+                placeholder="10.0.0.15"
+                value={(config.interfaces?.[0]?.ip_address as string) || ''}
+                onChange={(e) => {
+                  const ifaces = [...(config.interfaces || [{ id: 'eth0', name: 'eth0', enabled: true }])];
+                  ifaces[0] = { ...ifaces[0], ip_address: e.target.value };
+                  handleFieldChange('interfaces', ifaces);
+                }}
+                className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1.5 text-xs text-[#F3F5F8] focus:border-[#F59E0B] focus:outline-none font-mono"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-[#9BA5B5] block mb-1">Default Gateway</label>
+              <input
+                type="text"
+                placeholder="10.0.0.1"
+                value={(config.default_gateway as string) || ''}
+                onChange={(e) => handleFieldChange('default_gateway', e.target.value)}
+                className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1.5 text-xs text-[#F3F5F8] focus:border-[#F59E0B] focus:outline-none font-mono"
+              />
+            </div>
+
+            {/* Defensive Mitigations */}
+            <div className="pt-2 border-t border-[#293140] space-y-2">
+              <span className="text-[11px] font-semibold text-[#3B82F6] uppercase tracking-wider block">
+                Defensive Hardening Controls
+              </span>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  disabled={appMode === 'attack'}
+                  checked={!!config.fail2ban_enabled}
+                  onChange={(e) => handleFieldChange('fail2ban_enabled', e.target.checked)}
+                  className="accent-[#3B82F6] w-4 h-4 disabled:opacity-50"
+                />
+                <span className={`text-xs ${appMode === 'attack' ? 'text-[#9BA5B5]' : 'text-[#F3F5F8]'}`}>
+                  Enable Fail2ban (Brute-force auto-ban)
+                </span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  disabled={appMode === 'attack'}
+                  checked={!!config.rate_limiting}
+                  onChange={(e) => handleFieldChange('rate_limiting', e.target.checked)}
+                  className="accent-[#3B82F6] w-4 h-4 disabled:opacity-50"
+                />
+                <span className={`text-xs ${appMode === 'attack' ? 'text-[#9BA5B5]' : 'text-[#F3F5F8]'}`}>
+                  Enable SSH Rate Limiting (5 auth attempts/min)
+                </span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  disabled={appMode === 'attack'}
+                  checked={!config.weak_credentials}
+                  onChange={(e) => handleFieldChange('weak_credentials', !e.target.checked)}
+                  className="accent-[#3B82F6] w-4 h-4 disabled:opacity-50"
+                />
+                <span className={`text-xs ${appMode === 'attack' ? 'text-[#9BA5B5]' : 'text-[#F3F5F8]'}`}>
+                  Enforce Strong SSH Key Auth (Disables default password)
+                </span>
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* Web Application Server Config */}
+        {resourceType === 'web_server' && (
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-medium text-[#9BA5B5] block mb-1">IP Address (eth0)</label>
+              <input
+                type="text"
+                placeholder="10.0.0.20"
+                value={(config.interfaces?.[0]?.ip_address as string) || ''}
+                onChange={(e) => {
+                  const ifaces = [...(config.interfaces || [{ id: 'eth0', name: 'eth0', enabled: true }])];
+                  ifaces[0] = { ...ifaces[0], ip_address: e.target.value };
+                  handleFieldChange('interfaces', ifaces);
+                }}
+                className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1.5 text-xs text-[#F3F5F8] focus:border-[#3B82F6] focus:outline-none font-mono"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-[#9BA5B5] block mb-1">Default Gateway</label>
+              <input
+                type="text"
+                placeholder="10.0.0.1"
+                value={(config.default_gateway as string) || ''}
+                onChange={(e) => handleFieldChange('default_gateway', e.target.value)}
+                className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1.5 text-xs text-[#F3F5F8] focus:border-[#3B82F6] focus:outline-none font-mono"
+              />
+            </div>
+
+            {/* Defensive Web Mitigations */}
+            <div className="pt-2 border-t border-[#293140] space-y-2">
+              <span className="text-[11px] font-semibold text-[#3B82F6] uppercase tracking-wider block">
+                Web Defense & WAF Controls
+              </span>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  disabled={appMode === 'attack'}
+                  checked={!!config.waf_enabled}
+                  onChange={(e) => handleFieldChange('waf_enabled', e.target.checked)}
+                  className="accent-[#3B82F6] w-4 h-4 disabled:opacity-50"
+                />
+                <span className={`text-xs ${appMode === 'attack' ? 'text-[#9BA5B5]' : 'text-[#F3F5F8]'}`}>
+                  Web Application Firewall (WAF filter for SQLi & XSS)
+                </span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  disabled={appMode === 'attack'}
+                  checked={!!config.input_sanitization}
+                  onChange={(e) => handleFieldChange('input_sanitization', e.target.checked)}
+                  className="accent-[#3B82F6] w-4 h-4 disabled:opacity-50"
+                />
+                <span className={`text-xs ${appMode === 'attack' ? 'text-[#9BA5B5]' : 'text-[#F3F5F8]'}`}>
+                  Parameterized DB Queries & HTML Output Encoding
+                </span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  disabled={appMode === 'attack'}
+                  checked={!!config.tls_enabled}
+                  onChange={(e) => handleFieldChange('tls_enabled', e.target.checked)}
+                  className="accent-[#3B82F6] w-4 h-4 disabled:opacity-50"
+                />
+                <span className={`text-xs ${appMode === 'attack' ? 'text-[#9BA5B5]' : 'text-[#F3F5F8]'}`}>
+                  Enforce HTTPS / TLS 1.3 (Prevents cleartext sniffing)
+                </span>
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* DNS Server Config */}
+        {resourceType === 'dns_server' && (
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-medium text-[#9BA5B5] block mb-1">IP Address</label>
+              <input
+                type="text"
+                placeholder="10.0.0.53"
+                value={(config.interfaces?.[0]?.ip_address as string) || ''}
+                onChange={(e) => {
+                  const ifaces = [...(config.interfaces || [{ id: 'eth0', name: 'eth0', enabled: true }])];
+                  ifaces[0] = { ...ifaces[0], ip_address: e.target.value };
+                  handleFieldChange('interfaces', ifaces);
+                }}
+                className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1.5 text-xs text-[#F3F5F8] focus:border-[#A855F7] focus:outline-none font-mono"
+              />
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                disabled={appMode === 'attack'}
+                checked={!!config.dnssec_enabled}
+                onChange={(e) => handleFieldChange('dnssec_enabled', e.target.checked)}
+                className="accent-[#3B82F6] w-4 h-4 disabled:opacity-50"
+              />
+              <span className={`text-xs ${appMode === 'attack' ? 'text-[#9BA5B5]' : 'text-[#F3F5F8]'}`}>
+                Enable DNSSEC (Cryptographic Zone Signing)
+              </span>
+            </label>
+            <div className="text-[11px] text-[#9BA5B5] bg-[#171C26] p-2.5 rounded border border-[#293140]">
+              Authoritative DNS server answering queries for lab hostnames (e.g. redlab.local).
+            </div>
+          </div>
+        )}
+
+        {/* IDS / IPS Sensor Config */}
+        {resourceType === 'ids_ips' && (
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-medium text-[#9BA5B5] block mb-1">Operating Mode</label>
+              <select
+                disabled={appMode === 'attack'}
+                value={config.mode || 'ips'}
+                onChange={(e) => handleFieldChange('mode', e.target.value)}
+                className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1.5 text-xs text-[#F3F5F8] focus:border-[#F43F5E] focus:outline-none disabled:opacity-50"
+              >
+                <option value="ips">IPS (Inline Prevention - Drops malicious packets)</option>
+                <option value="ids">IDS (Passive Detection - Logs alerts only)</option>
+              </select>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                disabled={appMode === 'attack'}
+                checked={!!config.alert_on_scan}
+                onChange={(e) => handleFieldChange('alert_on_scan', e.target.checked)}
+                className="accent-[#3B82F6] w-4 h-4 disabled:opacity-50"
+              />
+              <span className={`text-xs ${appMode === 'attack' ? 'text-[#9BA5B5]' : 'text-[#F3F5F8]'}`}>
+                Alert on Port Scanning (TCP SYN / FIN thresholds)
+              </span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                disabled={appMode === 'attack'}
+                checked={!!config.drop_on_attack}
+                onChange={(e) => handleFieldChange('drop_on_attack', e.target.checked)}
+                className="accent-[#3B82F6] w-4 h-4 disabled:opacity-50"
+              />
+              <span className={`text-xs ${appMode === 'attack' ? 'text-[#9BA5B5]' : 'text-[#F3F5F8]'}`}>
+                Drop Packets Matching Attack Signatures (IPS only)
+              </span>
+            </label>
+          </div>
+        )}
+
+        {/* Layer 3 Switch Config */}
+        {resourceType === 'layer3_switch' && (
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!!config.inter_vlan_routing}
+                onChange={(e) => handleFieldChange('inter_vlan_routing', e.target.checked)}
+                className="accent-[#6366F1] w-4 h-4"
+              />
+              <span className="text-xs text-[#F3F5F8]">Enable Hardware Inter-VLAN Routing</span>
+            </label>
+            <div className="text-[11px] text-[#9BA5B5] bg-[#171C26] p-2.5 rounded border border-[#293140]">
+              Switch Virtual Interfaces (SVIs) forward routed packets between VLAN subnets with hardware line-rate speed.
+            </div>
+          </div>
+        )}
+
+        {/* Generic Endpoint Config */}
+        {resourceType === 'endpoint' && (
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-medium text-[#9BA5B5] block mb-1">Device Category</label>
+              <input
+                type="text"
+                placeholder="IoT / Camera / Printer"
+                value={(config.device_category as string) || 'IoT Endpoint'}
+                onChange={(e) => handleFieldChange('device_category', e.target.value)}
+                className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1.5 text-xs text-[#F3F5F8] focus:border-[#14B8A6] focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-[#9BA5B5] block mb-1">IP Address</label>
+              <input
+                type="text"
+                placeholder="192.168.1.50"
+                value={(config.interfaces?.[0]?.ip_address as string) || ''}
+                onChange={(e) => {
+                  const ifaces = [...(config.interfaces || [{ id: 'eth0', name: 'eth0', enabled: true }])];
+                  ifaces[0] = { ...ifaces[0], ip_address: e.target.value };
+                  handleFieldChange('interfaces', ifaces);
+                }}
+                className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1.5 text-xs text-[#F3F5F8] focus:border-[#14B8A6] focus:outline-none font-mono"
+              />
             </div>
           </div>
         )}

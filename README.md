@@ -12,47 +12,49 @@
 
 ---
 
-## Key Features
+## Key Features in RedLab 1.1.0
 
-1. **Interactive Visual Network Editor:**
-   - Full drag-and-drop canvas powered by `@xyflow/react`.
-   - Grid background, minimap, zoom, pan, and fit-to-view navigation.
-   - Comprehensive relationship validation across Layer 2/3 network link topologies.
-   - Real-time finding count alert chips and running service indicators rendered directly on canvas nodes.
+1. **Global Attack Mode (RED) & Defend Mode (BLUE):**
+   - **Prominent Toolbar Mode Switch:** Seamlessly switch perspectives between Attacker and Defender without rebuilding networks.
+   - **Mode-Aware Themes & Visual Identity:** Red-accented attacker aesthetic (`#FF3B4E`) vs Blue-accented defender aesthetic (`#3B82F6`) with dynamic link recoloring and node indicators.
+   - **Dual-Layer Mode Enforcement:** Defense policy edits are locked in Attack Mode, and backend independently rejects prohibited operations (403 Forbidden) if mode validation fails.
 
-2. **Network Device & Host Catalog:**
-   - **PC / Workstation:** Endpoint host with multi-interface IP addressing, subnet mask, default gateway, and DNS configuration.
-   - **Router:** Multi-interface Layer 3 routing engine with per-port IP configuration, static routing tables, and NAT support.
-   - **Switch:** Layer 2 broadcast domain forwarding with multi-port bridge and VLAN segmentation.
-   - **Server:** Host running network daemons (HTTP:80, HTTPS:443, SSH:22, MySQL:3306, FTP:21, Telnet:23, custom ports) with default gateway routing.
-   - **Firewall:** Stateful Layer 3/4 packet filter with prioritized rule evaluation (allow/deny, TCP/UDP/ICMP/Any, source/destination/port range).
-   - **External Network:** WAN / Internet boundary definition (0.0.0.0/0) for perimeter attack simulation.
+2. **Custom Visual Network Editor & 11 Device Types:**
+   - **PC / Workstation:** Standard client host with IP, subnet, gateway, and DNS configuration.
+   - **Linux Server:** Dedicated Linux target with SSH daemons, configurable root passwords, fail2ban auto-banning, and rate limiting.
+   - **Web Application Server:** HTTP/HTTPS server with toggleable WAF inspection, SQLi/XSS input sanitization, and TLS 1.3 encryption.
+   - **DNS Server:** Authoritative and recursive DNS server with configurable A records and DNSSEC zone signing.
+   - **Generic Server:** Multi-service host running HTTP, SSH, MySQL, and custom ports.
+   - **Router (L3):** Multi-interface Layer 3 routing engine with per-port IP configuration, static routing tables, and NAT support.
+   - **Layer 3 Switch:** High-performance multi-VLAN switch with Switch Virtual Interfaces (SVIs) and hardware line-rate inter-VLAN routing.
+   - **Layer 2 Switch:** Ethernet bridge with access/trunk port modes and VLAN tagging (802.1Q).
+   - **Firewall:** Stateful Layer 3/4 packet filter with prioritized rule evaluation (allow/deny, TCP/UDP/ICMP/Any, source/dest, port range).
+   - **IDS / IPS Sensor:** Intrusion detection & inline prevention sensor with signature matching (`emerging_threats`) and packet dropping.
+   - **External Network / Internet:** WAN boundary definition (`0.0.0.0/0`) for perimeter attacks and lateral movement testing.
+   - **Generic Endpoint:** IoT device, printer, or peripheral endpoint.
 
-3. **Network Attack & Port Scanning Engine:**
-   - **TCP Port Scanner:** Scan target hosts from any source node (e.g. Attacker PC or External WAN) across specified port ranges or standard profiles.
-   - **Service Discovery & Fingerprinting:** Deterministically maps ports as `OPEN` (daemon listening and reachable), `FILTERED` (blocked by firewall ACL), or `CLOSED` (TCP RST).
-   - **Firewall Evasion & ACL Evaluation:** Tests stateful packet filtering and reveals unauthorized service exposure.
+3. **Attack Scenario System & Interactive Launcher:**
+   - **Scenario A (Network Reconnaissance):** TCP SYN port scanning, socket fingerprinting, and service discovery.
+   - **Scenario B (Authentication Security):** SSH dictionary brute force against weak root credentials with fail2ban detection.
+   - **Scenario C (Traffic Analysis):** Cleartext HTTP token capture vs encrypted TLS 1.3 handshake with PCAP capture references.
+   - **Scenario D (Web Security Injection):** OWASP Top 10 SQL Injection (`' OR '1'='1'`) and reflected XSS payload execution.
+   - **Scenario E (Firewall & Segmentation Testing):** Cross-VLAN lateral movement probe evaluating firewall default-deny filtering.
+   - **Live Evidence Capture:** Automatically captures leaked passwords, bearer tokens, open sockets, and packet traces.
 
-4. **Deterministic Network Simulation Engine:**
-   - **Topology Validation:** Deep validation checking for duplicate IDs, link integrity, IP address syntax, CIDR prefixes, and isolated devices.
-   - **Connectivity Evaluation:** Evaluates same-subnet direct communication, Layer 2 switch forwarding, cross-subnet router hops with gateway validation, and inline firewall filtering.
-   - **Interactive Ping Tool:** Test live connectivity between any two nodes on the canvas with packet exchange trace logs.
-   - **Traffic Inspector:** Packet-level network event log capturing `icmp_request`, `icmp_reply`, `icmp_unreachable`, `port_scan_probe`, `port_scan_open`, `port_scan_filtered`, `firewall_allow`, `firewall_deny`, `routing_lookup`, and `arp_request`.
+4. **Defend Mode & "Verify Defense" Workflow:**
+   - Configure defensive ACLs, WAF rules, IPS dropping, and fail2ban rate limits in the Property Inspector.
+   - Controlled **"Verify Defense"** workflow reruns the approved test against the hardened lab without exposing raw attack launch controls.
+   - **Side-by-Side Before/After Comparison:** Displays Initial Attack (e.g. 100% compromise rate) vs Defended Outcome (e.g. 0% exploit rate, packets blocked).
+   - **Educational Root Cause & Verdict:** Clear explanations explaining how the defense neutralized the threat.
 
-5. **Guided Training Scenarios with Automated Assessment:**
-   - **Basic Network Connectivity:** Hands-on IP subnetting and gateway routing lab.
-   - **Firewall Defense Lab:** Perimeter security exercise to block unauthorized SSH access while maintaining legitimate web traffic.
-   - **Network Troubleshooting:** Interactive fault diagnostic challenge where students diagnose and remediate broken routing tables and gateway configurations.
-   - Automated deterministic grading engine scoring submitted topologies against scenario objectives.
+5. **Deterministic Network Simulation Engine:**
+   - Topology validation: duplicate IDs, link integrity, IP address syntax, CIDR prefixes, and isolated devices.
+   - Layer 2/3 connectivity: same-subnet switching, router hops, gateway validation, and firewall stateful inspection.
+   - Interactive Ping Tool and Traffic Inspector with protocol filtering.
 
-6. **Network Security & Attack Path Engine:**
-   - 8 deterministic security rules evaluating WAN exposure, firewall policies, unencrypted services, and VLAN segmentation.
-   - Multi-step attack path analyzer showing realistic attack chains from external public IPs and attacker workstations through perimeter firewalls to internal vulnerable servers.
-
-7. **Persistence & Lifecycle:**
-   - Persistent SQLite database storing labs, runs, packet event histories, port scan traces, and security audits.
-   - Export and import laboratories as validated JSON packages with schema integrity validation.
-   - Built-in one-click template: *"Enterprise Perimeter & DMZ Network"*.
+6. **Safety & Execution Isolation:**
+   - Fully local, self-contained educational simulation with 0 external network requests or real exploits.
+   - Server-side target boundary isolation preventing attacks outside the selected lab environment.
 
 ---
 

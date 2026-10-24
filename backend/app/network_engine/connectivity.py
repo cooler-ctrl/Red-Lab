@@ -108,11 +108,11 @@ def _get_node_ip_and_prefix(node: GraphNode) -> tuple[str, str]:
     t = node.type
     if t == "pc":
         return _get_pc_ip_prefix(node)
-    elif t == "server":
+    elif t in ("server", "linux_server", "web_server", "dns_server", "endpoint"):
         return _get_server_ip_prefix(node)
-    elif t == "firewall":
+    elif t in ("firewall", "ids_ips"):
         return _get_firewall_ip_prefix(node)
-    elif t == "router":
+    elif t in ("router", "layer3_switch"):
         # Use first interface
         ips = _get_router_interface_ips(node)
         if ips:
@@ -208,7 +208,7 @@ def _find_firewall_between(graph: GraphData, src_node: GraphNode, dst_node: Grap
     dst_reachable = get_reachable_via_switches(dst_node)
 
     for node in graph.nodes:
-        if node.type == "firewall":
+        if node.type in ("firewall", "ids_ips"):
             fw_neighbors = {n.id for n in _get_neighbors(graph, node.id)}
             touches_src = bool(fw_neighbors & src_reachable)
             touches_dst = bool(fw_neighbors & dst_reachable)
@@ -232,7 +232,7 @@ def _find_router_between(graph: GraphData, src_node: GraphNode, dst_node: GraphN
                 continue
             visited.add(current.id)
             for neighbor in _get_neighbors(graph, current.id):
-                if neighbor.type in ("switch", "pc", "server", "firewall") and neighbor.id not in visited:
+                if neighbor.type not in ("router", "external_network") and neighbor.id not in visited:
                     queue.append(neighbor)
         return visited
 
@@ -241,7 +241,7 @@ def _find_router_between(graph: GraphData, src_node: GraphNode, dst_node: GraphN
 
     # Find a router reachable from both sides
     for node in graph.nodes:
-        if node.type == "router":
+        if node.type in ("router", "layer3_switch"):
             router_neighbors = {n.id for n in _get_neighbors(graph, node.id)}
             # Check if router is adjacent to something in src_reachable and dst_reachable
             touches_src = bool(router_neighbors & src_reachable)

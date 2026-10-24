@@ -20,26 +20,18 @@ const nodeTypes = {
   resourceNode: ResourceNode,
 };
 
-// Valid relationship definitions: [sourceType, targetType, relationship_type]
-const VALID_RELATIONSHIPS: Array<[ResourceType, ResourceType, string]> = [
-  ['pc', 'switch', 'connects'],
-  ['pc', 'router', 'connects'],
-  ['pc', 'firewall', 'connects'],
-  ['pc', 'pc', 'connects'],
-  ['pc', 'external_network', 'connects'],
-  ['server', 'switch', 'connects'],
-  ['server', 'router', 'connects'],
-  ['server', 'firewall', 'connects'],
-  ['server', 'external_network', 'connects'],
-  ['switch', 'router', 'connects'],
-  ['switch', 'firewall', 'connects'],
-  ['switch', 'switch', 'connects'],
-  ['switch', 'external_network', 'connects'],
-  ['router', 'firewall', 'connects'],
-  ['router', 'router', 'connects'],
-  ['external_network', 'firewall', 'connects'],
-  ['external_network', 'router', 'connects'],
-];
+const HOST_TYPES: Set<ResourceType> = new Set([
+  'pc',
+  'server',
+  'linux_server',
+  'web_server',
+  'dns_server',
+  'endpoint',
+]);
+const SWITCH_TYPES: Set<ResourceType> = new Set(['switch', 'layer3_switch']);
+const ROUTER_TYPES: Set<ResourceType> = new Set(['router', 'layer3_switch']);
+const SECURITY_TYPES: Set<ResourceType> = new Set(['firewall', 'ids_ips']);
+const WAN_TYPES: Set<ResourceType> = new Set(['external_network']);
 
 function getValidRelationship(typeA: ResourceType, typeB: ResourceType): {
   isValid: boolean;
@@ -48,28 +40,73 @@ function getValidRelationship(typeA: ResourceType, typeB: ResourceType): {
   relationshipType?: string;
   isReversed?: boolean;
 } {
-  // Check direct A -> B
-  const direct = VALID_RELATIONSHIPS.find(([s, t]) => s === typeA && t === typeB);
-  if (direct) {
-    return {
-      isValid: true,
-      sourceType: direct[0],
-      targetType: direct[1],
-      relationshipType: direct[2],
-      isReversed: false,
-    };
-  }
+  // Direct device matches
+  const isHostA = HOST_TYPES.has(typeA);
+  const isHostB = HOST_TYPES.has(typeB);
+  const isSwitchA = SWITCH_TYPES.has(typeA);
+  const isSwitchB = SWITCH_TYPES.has(typeB);
+  const isRouterA = ROUTER_TYPES.has(typeA);
+  const isRouterB = ROUTER_TYPES.has(typeB);
+  const isSecurityA = SECURITY_TYPES.has(typeA);
+  const isSecurityB = SECURITY_TYPES.has(typeB);
+  const isWanA = WAN_TYPES.has(typeA);
+  const isWanB = WAN_TYPES.has(typeB);
 
-  // Check reversed B -> A
-  const reversed = VALID_RELATIONSHIPS.find(([s, t]) => s === typeB && t === typeA);
-  if (reversed) {
-    return {
-      isValid: true,
-      sourceType: reversed[0],
-      targetType: reversed[1],
-      relationshipType: reversed[2],
-      isReversed: true,
-    };
+  // Host <-> Switch
+  if ((isHostA && isSwitchB) || (isHostB && isSwitchA)) {
+    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
+  }
+  // Host <-> Router
+  if ((isHostA && isRouterB) || (isHostB && isRouterA)) {
+    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
+  }
+  // Host <-> Security (Firewall / IDS)
+  if ((isHostA && isSecurityB) || (isHostB && isSecurityA)) {
+    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
+  }
+  // Host <-> Host (Direct peer cross-over link)
+  if (isHostA && isHostB) {
+    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
+  }
+  // Host <-> WAN
+  if ((isHostA && isWanB) || (isHostB && isWanA)) {
+    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
+  }
+  // Switch <-> Switch (Trunk / Uplink)
+  if (isSwitchA && isSwitchB) {
+    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
+  }
+  // Switch <-> Router (Gateway uplink)
+  if ((isSwitchA && isRouterB) || (isSwitchB && isRouterA)) {
+    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
+  }
+  // Switch <-> Security
+  if ((isSwitchA && isSecurityB) || (isSwitchB && isSecurityA)) {
+    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
+  }
+  // Switch <-> WAN
+  if ((isSwitchA && isWanB) || (isSwitchB && isWanA)) {
+    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
+  }
+  // Router <-> Router
+  if (isRouterA && isRouterB) {
+    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
+  }
+  // Router <-> Security
+  if ((isRouterA && isSecurityB) || (isRouterB && isSecurityA)) {
+    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
+  }
+  // Router <-> WAN
+  if ((isRouterA && isWanB) || (isRouterB && isWanA)) {
+    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
+  }
+  // Security <-> Security
+  if (isSecurityA && isSecurityB) {
+    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
+  }
+  // Security <-> WAN
+  if ((isSecurityA && isWanB) || (isSecurityB && isWanA)) {
+    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
   }
 
   return { isValid: false };
@@ -88,6 +125,7 @@ function CanvasInner() {
   const addNode = useEditorStore((s) => s.addNode);
   const selectNode = useEditorStore((s) => s.selectNode);
   const updateNodeConfig = useEditorStore((s) => s.updateNodeConfig);
+  const appMode = useEditorStore((s) => s.appMode);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -173,7 +211,7 @@ function CanvasInner() {
         source: canonicalSourceId,
         target: canonicalTargetId,
         animated: true,
-        style: { stroke: '#3B82F6', strokeWidth: 2 },
+        style: { stroke: appMode === 'attack' ? '#FF3B4E' : '#3B82F6', strokeWidth: 2 },
         data: {
           relationship_type: relationshipType,
           metadata: {},

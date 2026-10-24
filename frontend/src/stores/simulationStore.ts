@@ -1,8 +1,16 @@
 import { create } from 'zustand';
-import type { LabRun, NetworkEvent, TopologyValidationResult } from '../types';
+import type {
+  LabRun,
+  NetworkEvent,
+  TopologyValidationResult,
+  AttackExecutionRequest,
+  AttackExecutionResponse,
+  VerifyDefenseRequest,
+  BeforeAfterComparison,
+} from '../types';
 import { api } from '../services/api';
 
-export type BottomTab = 'security' | 'simulation' | 'traffic' | 'ping' | 'portscan';
+export type BottomTab = 'security' | 'simulation' | 'traffic' | 'ping' | 'portscan' | 'attack' | 'defense_verify';
 
 interface SimulationStore {
   currentRun: LabRun | null;
@@ -14,6 +22,10 @@ interface SimulationStore {
   pingEvents: NetworkEvent[];
   portScanLoading: boolean;
   portScanEvents: NetworkEvent[];
+  attackLoading: boolean;
+  attackResponse: AttackExecutionResponse | null;
+  verifyLoading: boolean;
+  comparisonResult: BeforeAfterComparison | null;
   bottomTab: BottomTab;
   panelOpen: boolean;
 
@@ -25,6 +37,8 @@ interface SimulationStore {
   loadRunEvents: (runId: string, eventType?: string) => Promise<void>;
   runPing: (labId: string, sourceId: string, destId: string) => Promise<NetworkEvent[]>;
   runPortScan: (labId: string, sourceId: string, destId: string, ports?: number[]) => Promise<NetworkEvent[]>;
+  executeAttack: (labId: string, req: AttackExecutionRequest) => Promise<AttackExecutionResponse>;
+  runVerifyDefense: (labId: string, req: VerifyDefenseRequest) => Promise<AttackExecutionResponse>;
 }
 
 export const useSimulationStore = create<SimulationStore>((set) => ({
@@ -37,6 +51,10 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
   pingEvents: [],
   portScanLoading: false,
   portScanEvents: [],
+  attackLoading: false,
+  attackResponse: null,
+  verifyLoading: false,
+  comparisonResult: null,
   bottomTab: 'security',
   panelOpen: false,
 
@@ -140,4 +158,42 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
       throw error;
     }
   },
+
+  executeAttack: async (labId: string, req: AttackExecutionRequest) => {
+    set({ attackLoading: true });
+    try {
+      const response = await api.executeAttack(labId, req);
+      set({
+        attackResponse: response,
+        attackLoading: false,
+        bottomTab: 'attack',
+        panelOpen: true,
+      });
+      return response;
+    } catch (error) {
+      set({ attackLoading: false });
+      console.error('Attack execution failed:', error);
+      throw error;
+    }
+  },
+
+  runVerifyDefense: async (labId: string, req: VerifyDefenseRequest) => {
+    set({ verifyLoading: true });
+    try {
+      const response = await api.verifyDefense(labId, req);
+      set({
+        attackResponse: response,
+        comparisonResult: response.comparison || null,
+        verifyLoading: false,
+        bottomTab: 'defense_verify',
+        panelOpen: true,
+      });
+      return response;
+    } catch (error) {
+      set({ verifyLoading: false });
+      console.error('Verify defense failed:', error);
+      throw error;
+    }
+  },
 }));
+

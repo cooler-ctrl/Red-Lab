@@ -7,7 +7,7 @@ import {
   type NodeChange,
   type EdgeChange,
 } from '@xyflow/react';
-import type { Lab, ScanResult, Finding, GraphData, GraphNode, GraphEdge, ResourceType } from '../types';
+import type { Lab, ScanResult, Finding, GraphData, GraphNode, GraphEdge, ResourceType, AppMode } from '../types';
 import { api } from '../services/api';
 
 export interface ResourceNodeData extends Record<string, unknown> {
@@ -27,7 +27,9 @@ interface EditorStore {
   saving: boolean;
   hasUnsavedChanges: boolean;
   scanPanelOpen: boolean;
+  appMode: AppMode;
 
+  setAppMode: (mode: AppMode) => void;
   loadLab: (labId: string) => Promise<void>;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
@@ -80,7 +82,7 @@ export function flowToGraphData(nodes: Node[], edges: Edge[]): GraphData {
     const data = n.data as ResourceNodeData;
     return {
       id: n.id,
-      type: (data.resourceType || 'ec2') as ResourceType,
+      type: (data.resourceType || 'pc') as ResourceType,
       position: { x: Math.round(n.position.x), y: Math.round(n.position.y) },
       label: (data.label as string) || n.id,
       config: (data.config as Record<string, unknown>) || {},
@@ -111,6 +113,18 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   saving: false,
   hasUnsavedChanges: false,
   scanPanelOpen: false,
+  appMode: 'attack',
+
+  setAppMode: (mode: AppMode) => {
+    const edgeColor = mode === 'attack' ? '#FF3B4E' : '#3B82F6';
+    set((state) => ({
+      appMode: mode,
+      edges: state.edges.map((e) => ({
+        ...e,
+        style: { ...e.style, stroke: edgeColor },
+      })),
+    }));
+  },
 
   loadLab: async (labId: string) => {
     try {

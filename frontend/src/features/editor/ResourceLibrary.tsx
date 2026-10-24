@@ -9,6 +9,11 @@ import {
   Search,
   Server,
   ShieldAlert,
+  Terminal,
+  HardDrive,
+  Layers,
+  Eye,
+  Cpu,
 } from 'lucide-react';
 import type { ResourceType } from '../../types';
 
@@ -22,24 +27,20 @@ export const DEFAULT_CONFIGS: Record<ResourceType, Record<string, unknown>> = {
     dns_servers: ['8.8.8.8'],
     os: 'Linux',
   },
-  router: {
-    name: 'Router-1',
+  linux_server: {
+    name: 'Linux-Server-1',
     interfaces: [
-      { id: 'eth0', name: 'eth0', ip_address: '192.168.1.1', cidr_prefix: '24', enabled: true },
-      { id: 'eth1', name: 'eth1', ip_address: '10.0.0.1', cidr_prefix: '24', enabled: true },
+      { id: 'eth0', name: 'eth0', ip_address: '10.0.0.15', cidr_prefix: '24', enabled: true },
     ],
-    static_routes: [],
-    nat_enabled: false,
-  },
-  switch: {
-    name: 'Switch-1',
-    ports: [
-      { id: 'p1', name: 'FastEthernet0/1', vlan: 1, enabled: true },
-      { id: 'p2', name: 'FastEthernet0/2', vlan: 1, enabled: true },
-      { id: 'p3', name: 'FastEthernet0/3', vlan: 1, enabled: true },
-      { id: 'p4', name: 'FastEthernet0/4', vlan: 1, enabled: true },
+    default_gateway: '10.0.0.1',
+    dns_servers: ['8.8.8.8'],
+    services: [
+      { name: 'SSH', port: 22, protocol: 'tcp', enabled: true },
     ],
-    default_vlan: 1,
+    os: 'Debian 12',
+    fail2ban_enabled: false,
+    rate_limiting: false,
+    weak_credentials: true,
   },
   server: {
     name: 'Server-1',
@@ -51,6 +52,77 @@ export const DEFAULT_CONFIGS: Record<ResourceType, Record<string, unknown>> = {
       { name: 'SSH', port: 22, protocol: 'tcp', enabled: true },
     ],
     os: 'Ubuntu 24.04',
+  },
+  web_server: {
+    name: 'Web-Server-1',
+    interfaces: [
+      { id: 'eth0', name: 'eth0', ip_address: '10.0.0.20', cidr_prefix: '24', enabled: true },
+    ],
+    default_gateway: '10.0.0.1',
+    dns_servers: ['8.8.8.8'],
+    services: [
+      { name: 'HTTP', port: 80, protocol: 'tcp', enabled: true },
+      { name: 'HTTPS', port: 443, protocol: 'tcp', enabled: true },
+    ],
+    waf_enabled: false,
+    input_sanitization: false,
+    tls_enabled: false,
+  },
+  dns_server: {
+    name: 'DNS-Server-1',
+    interfaces: [
+      { id: 'eth0', name: 'eth0', ip_address: '10.0.0.53', cidr_prefix: '24', enabled: true },
+    ],
+    default_gateway: '10.0.0.1',
+    services: [
+      { name: 'DNS', port: 53, protocol: 'udp', enabled: true },
+    ],
+    dns_records: [
+      { host: 'redlab.local', type: 'A', value: '10.0.0.20' },
+      { host: 'gateway.local', type: 'A', value: '10.0.0.1' },
+    ],
+    dnssec_enabled: false,
+  },
+  endpoint: {
+    name: 'Endpoint-1',
+    interfaces: [
+      { id: 'eth0', name: 'eth0', ip_address: '192.168.1.50', cidr_prefix: '24', enabled: true },
+    ],
+    default_gateway: '192.168.1.1',
+    device_category: 'IoT / Camera',
+  },
+  router: {
+    name: 'Router-1',
+    interfaces: [
+      { id: 'eth0', name: 'eth0', ip_address: '192.168.1.1', cidr_prefix: '24', enabled: true },
+      { id: 'eth1', name: 'eth1', ip_address: '10.0.0.1', cidr_prefix: '24', enabled: true },
+    ],
+    static_routes: [],
+    nat_enabled: false,
+  },
+  layer3_switch: {
+    name: 'L3-Switch-1',
+    ports: [
+      { id: 'p1', name: 'GigabitEthernet0/1', vlan: 10, enabled: true },
+      { id: 'p2', name: 'GigabitEthernet0/2', vlan: 20, enabled: true },
+      { id: 'p3', name: 'GigabitEthernet0/3', vlan: 1, enabled: true },
+      { id: 'p4', name: 'GigabitEthernet0/4', vlan: 1, enabled: true },
+    ],
+    svi_interfaces: [
+      { vlan: 10, ip_address: '192.168.10.1', cidr_prefix: '24' },
+      { vlan: 20, ip_address: '192.168.20.1', cidr_prefix: '24' },
+    ],
+    inter_vlan_routing: true,
+  },
+  switch: {
+    name: 'Switch-1',
+    ports: [
+      { id: 'p1', name: 'FastEthernet0/1', vlan: 1, enabled: true },
+      { id: 'p2', name: 'FastEthernet0/2', vlan: 1, enabled: true },
+      { id: 'p3', name: 'FastEthernet0/3', vlan: 1, enabled: true },
+      { id: 'p4', name: 'FastEthernet0/4', vlan: 1, enabled: true },
+    ],
+    default_vlan: 1,
   },
   firewall: {
     name: 'Firewall-1',
@@ -73,6 +145,15 @@ export const DEFAULT_CONFIGS: Record<ResourceType, Record<string, unknown>> = {
     outbound_rules: [],
     default_inbound_action: 'deny',
     default_outbound_action: 'allow',
+  },
+  ids_ips: {
+    name: 'IDS-IPS-1',
+    ip_address: '10.0.0.2',
+    cidr_prefix: '24',
+    mode: 'ips',
+    alert_on_scan: true,
+    drop_on_attack: true,
+    signature_set: 'emerging_threats',
   },
   external_network: {
     name: 'Internet',
@@ -101,16 +182,49 @@ const CATEGORIES: CategoryDefinition[] = [
       {
         type: 'pc',
         label: 'PC / Workstation',
-        description: 'Host endpoint with IP & gateway',
+        description: 'Standard host with IP & gateway',
         icon: Monitor,
         color: '#10B981',
       },
       {
+        type: 'linux_server',
+        label: 'Linux Server',
+        description: 'Dedicated Linux system (SSH/fail2ban)',
+        icon: Terminal,
+        color: '#F59E0B',
+      },
+      {
         type: 'server',
-        label: 'Server',
+        label: 'Generic Server',
         description: 'Host running services (HTTP, SSH, DB)',
         icon: Server,
         color: '#EC4899',
+      },
+      {
+        type: 'endpoint',
+        label: 'Generic Endpoint',
+        description: 'IoT device, printer, or peripheral',
+        icon: Cpu,
+        color: '#14B8A6',
+      },
+    ],
+  },
+  {
+    name: 'Application Servers',
+    resources: [
+      {
+        type: 'web_server',
+        label: 'Web Application Server',
+        description: 'HTTP/HTTPS server (WAF/OWASP target)',
+        icon: Globe,
+        color: '#3B82F6',
+      },
+      {
+        type: 'dns_server',
+        label: 'DNS Nameserver',
+        description: 'Authoritative / recursive resolver',
+        icon: HardDrive,
+        color: '#A855F7',
       },
     ],
   },
@@ -119,15 +233,22 @@ const CATEGORIES: CategoryDefinition[] = [
     resources: [
       {
         type: 'router',
-        label: 'Router',
+        label: 'Router (L3)',
         description: 'Layer 3 packet routing & gateways',
         icon: Router,
         color: '#3B82F6',
       },
       {
+        type: 'layer3_switch',
+        label: 'Layer 3 Switch',
+        description: 'Multi-VLAN switch with SVI routing',
+        icon: Layers,
+        color: '#6366F1',
+      },
+      {
         type: 'switch',
-        label: 'Switch',
-        description: 'Layer 2 ethernet bridge & VLANs',
+        label: 'Layer 2 Switch',
+        description: 'Ethernet bridge & VLAN tagging',
         icon: Network,
         color: '#8B5CF6',
       },
@@ -142,6 +263,13 @@ const CATEGORIES: CategoryDefinition[] = [
         description: 'Stateful packet filter & ACL rules',
         icon: ShieldAlert,
         color: '#EF4444',
+      },
+      {
+        type: 'ids_ips',
+        label: 'IDS / IPS Sensor',
+        description: 'Network intrusion detection & prevention',
+        icon: Eye,
+        color: '#F43F5E',
       },
       {
         type: 'external_network',

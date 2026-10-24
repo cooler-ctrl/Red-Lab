@@ -16,28 +16,53 @@ from dataclasses import dataclass, field
 from ..schemas.lab import GraphData, GraphNode, TopologyValidationError, TopologyValidationResult
 
 
+# Device categories
+HOST_DEVICE_TYPES = {"pc", "server", "linux_server", "web_server", "dns_server", "endpoint"}
+ROUTER_DEVICE_TYPES = {"router", "layer3_switch"}
+SWITCH_DEVICE_TYPES = {"switch", "layer3_switch"}
+SECURITY_DEVICE_TYPES = {"firewall", "ids_ips"}
+WAN_DEVICE_TYPES = {"external_network"}
+
+NETWORK_DEVICE_TYPES = (
+    HOST_DEVICE_TYPES
+    | ROUTER_DEVICE_TYPES
+    | SWITCH_DEVICE_TYPES
+    | SECURITY_DEVICE_TYPES
+    | WAN_DEVICE_TYPES
+)
+ALL_VALID_TYPES = NETWORK_DEVICE_TYPES
+
 # Valid link relationships for network devices
 VALID_NETWORK_LINKS: set[frozenset[str]] = {
-    frozenset(["pc", "switch"]),
-    frozenset(["pc", "router"]),
-    frozenset(["pc", "firewall"]),
-    frozenset(["server", "switch"]),
-    frozenset(["server", "router"]),
-    frozenset(["server", "firewall"]),
-    frozenset(["switch", "router"]),
-    frozenset(["switch", "firewall"]),
-    frozenset(["switch", "switch"]),
-    frozenset(["router", "router"]),
-    frozenset(["router", "firewall"]),
-    frozenset(["router", "external_network"]),
-    frozenset(["firewall", "external_network"]),
-    frozenset(["switch", "external_network"]),
-    frozenset(["pc", "pc"]),
-    frozenset(["pc", "external_network"]),
+    frozenset([h, s]) for h in HOST_DEVICE_TYPES for s in SWITCH_DEVICE_TYPES
+} | {
+    frozenset([h, r]) for h in HOST_DEVICE_TYPES for r in ROUTER_DEVICE_TYPES
+} | {
+    frozenset([h, sec]) for h in HOST_DEVICE_TYPES for sec in SECURITY_DEVICE_TYPES
+} | {
+    frozenset([s, r]) for s in SWITCH_DEVICE_TYPES for r in ROUTER_DEVICE_TYPES
+} | {
+    frozenset([s, sec]) for s in SWITCH_DEVICE_TYPES for sec in SECURITY_DEVICE_TYPES
+} | {
+    frozenset([s1, s2]) for s1 in SWITCH_DEVICE_TYPES for s2 in SWITCH_DEVICE_TYPES
+} | {
+    frozenset([r1, r2]) for r1 in ROUTER_DEVICE_TYPES for r2 in ROUTER_DEVICE_TYPES
+} | {
+    frozenset([r, sec]) for r in ROUTER_DEVICE_TYPES for sec in SECURITY_DEVICE_TYPES
+} | {
+    frozenset([r, "external_network"]) for r in ROUTER_DEVICE_TYPES
+} | {
+    frozenset([sec, "external_network"]) for sec in SECURITY_DEVICE_TYPES
+} | {
+    frozenset([s, "external_network"]) for s in SWITCH_DEVICE_TYPES
+} | {
+    frozenset([h1, h2]) for h1 in HOST_DEVICE_TYPES for h2 in HOST_DEVICE_TYPES
+} | {
+    frozenset([h, "external_network"]) for h in HOST_DEVICE_TYPES
+} | {
+    frozenset([sec1, sec2]) for sec1 in SECURITY_DEVICE_TYPES for sec2 in SECURITY_DEVICE_TYPES
 }
 
-NETWORK_DEVICE_TYPES = {"pc", "router", "switch", "server", "firewall", "external_network"}
-ALL_VALID_TYPES = NETWORK_DEVICE_TYPES
 
 
 def _is_valid_ip(ip: str) -> bool:
@@ -260,11 +285,11 @@ def validate_topology(graph: GraphData) -> TopologyValidationResult:
     for node in graph.nodes:
         if node.type == "pc":
             _validate_pc_node(node, errors, warnings)
-        elif node.type == "router":
+        elif node.type in ("router", "layer3_switch"):
             _validate_router_node(node, errors, warnings)
-        elif node.type == "server":
+        elif node.type in ("server", "linux_server", "web_server", "dns_server", "endpoint"):
             _validate_server_node(node, errors, warnings)
-        elif node.type == "firewall":
+        elif node.type in ("firewall", "ids_ips"):
             _validate_firewall_node(node, errors, warnings)
 
 

@@ -5,14 +5,15 @@ import {
   ArrowLeft,
   Check,
   CheckCircle2,
-  Cloud,
-  FileCheck,
+  Crosshair,
+  Flame,
   Layers,
   Loader2,
-  Play,
   Save,
   Send,
+  Shield,
   ShieldAlert,
+  ShieldCheck,
 } from 'lucide-react';
 import { useEditorStore } from '../../stores/editorStore';
 import { useSimulationStore } from '../../stores/simulationStore';
@@ -30,6 +31,8 @@ export function EditorToolbar() {
   const hasUnsavedChanges = useEditorStore((s) => s.hasUnsavedChanges);
   const saveLab = useEditorStore((s) => s.saveLab);
   const runScan = useEditorStore((s) => s.runScan);
+  const appMode = useEditorStore((s) => s.appMode);
+  const setAppMode = useEditorStore((s) => s.setAppMode);
 
   const validateTopology = useSimulationStore((s) => s.validateTopology);
   const startSimulation = useSimulationStore((s) => s.startSimulation);
@@ -133,15 +136,77 @@ export function EditorToolbar() {
         </div>
       </div>
 
-      {/* Center: Mode Badge */}
-      <div className="hidden lg:flex items-center gap-2 px-3 py-1 rounded-full bg-[#171C26] border border-[#293140] text-xs">
-        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-        <span className="text-[#9BA5B5]">Engine:</span>
-        <span className="font-semibold text-emerald-400">Simulator Mode (Deterministic)</span>
+      {/* Center: Global Mode Switch (Attack RED vs Defend BLUE) */}
+      <div className="flex items-center gap-2">
+        <div className="flex items-center bg-[#0B0D12] p-1 rounded-lg border border-[#293140] shadow-inner">
+          {/* Attack Mode Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setAppMode('attack');
+              setBottomTab('attack');
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-semibold transition-all ${
+              appMode === 'attack'
+                ? 'bg-[#FF3B4E] text-white shadow-lg shadow-[#FF3B4E]/30'
+                : 'text-[#9BA5B5] hover:text-[#F3F5F8] hover:bg-[#171C26]'
+            }`}
+          >
+            <Flame size={13} className={appMode === 'attack' ? 'text-white' : 'text-[#FF3B4E]'} />
+            <span>ATTACK MODE</span>
+          </button>
+
+          {/* Defend Mode Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setAppMode('defend');
+              setBottomTab('defense_verify');
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-semibold transition-all ${
+              appMode === 'defend'
+                ? 'bg-[#3B82F6] text-white shadow-lg shadow-[#3B82F6]/30'
+                : 'text-[#9BA5B5] hover:text-[#F3F5F8] hover:bg-[#171C26]'
+            }`}
+          >
+            <ShieldCheck size={13} className={appMode === 'defend' ? 'text-white' : 'text-[#3B82F6]'} />
+            <span>DEFEND MODE</span>
+          </button>
+        </div>
+
+        {/* Engine status indicator */}
+        <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#171C26] border border-[#293140] text-[11px]">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-[#9BA5B5]">Engine:</span>
+          <span className="font-medium text-emerald-400">Deterministic Sim</span>
+        </div>
       </div>
 
       {/* Right: Actions */}
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Mode Specific Action Button */}
+        {appMode === 'attack' ? (
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={() => setBottomTab('attack')}
+            icon={<Crosshair size={13} />}
+            title="Open Attack Scenario Launcher"
+          >
+            Attack Launcher
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setBottomTab('defense_verify')}
+            icon={<Shield size={13} className="text-[#3B82F6]" />}
+            title="Open Defense Verification & Remediation"
+          >
+            Verify Defense
+          </Button>
+        )}
+
         {/* Validate Button */}
         <Button
           size="sm"
@@ -211,10 +276,10 @@ export function EditorToolbar() {
           Save
         </Button>
 
-        {/* Scan Button */}
+        {/* Scan Button (in Defend Mode, or overall) */}
         <Button
           size="sm"
-          variant="primary"
+          variant={appMode === 'attack' ? 'secondary' : 'primary'}
           onClick={handleRunScan}
           loading={scanning}
           icon={<ShieldAlert size={14} />}
@@ -227,3 +292,4 @@ export function EditorToolbar() {
 }
 
 export default EditorToolbar;
+
