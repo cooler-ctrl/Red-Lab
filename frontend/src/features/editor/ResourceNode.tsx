@@ -82,23 +82,35 @@ function ResourceNode({ data, selected }: NodeProps) {
       style={{ backgroundColor: '#171C26' }}
     >
       <Handle
+        id="top"
         type="target"
         position={Position.Top}
+        isConnectableStart={true}
+        isConnectableEnd={true}
         className="!bg-[#293140] !border-[#3d4a5c] !w-3 !h-3 hover:!bg-[#3B82F6]"
       />
       <Handle
+        id="bottom"
         type="source"
         position={Position.Bottom}
+        isConnectableStart={true}
+        isConnectableEnd={true}
         className="!bg-[#293140] !border-[#3d4a5c] !w-3 !h-3 hover:!bg-[#3B82F6]"
       />
       <Handle
+        id="left"
         type="target"
         position={Position.Left}
+        isConnectableStart={true}
+        isConnectableEnd={true}
         className="!bg-[#293140] !border-[#3d4a5c] !w-3 !h-3 hover:!bg-[#3B82F6]"
       />
       <Handle
+        id="right"
         type="source"
         position={Position.Right}
+        isConnectableStart={true}
+        isConnectableEnd={true}
         className="!bg-[#293140] !border-[#3d4a5c] !w-3 !h-3 hover:!bg-[#3B82F6]"
       />
 

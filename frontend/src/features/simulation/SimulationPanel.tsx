@@ -26,8 +26,6 @@ import {
 } from 'lucide-react';
 import { useEditorStore, type ResourceNodeData } from '../../stores/editorStore';
 import { useSimulationStore, type BottomTab } from '../../stores/simulationStore';
-import { FindingCard } from '../security/FindingCard';
-import { AttackPathView } from '../security/AttackPathView';
 import { Button } from '../../components/Button';
 import { useToast } from '../../components/Toast';
 import type { NetworkEvent } from '../../types';
@@ -38,9 +36,6 @@ export function SimulationPanel() {
   // Editor Store
   const lab = useEditorStore((s) => s.lab);
   const nodes = useEditorStore((s) => s.nodes);
-  const scanResult = useEditorStore((s) => s.scanResult);
-  const scanning = useEditorStore((s) => s.scanning);
-  const runScan = useEditorStore((s) => s.runScan);
   const selectNode = useEditorStore((s) => s.selectNode);
   const appMode = useEditorStore((s) => s.appMode);
   const setAppMode = useEditorStore((s) => s.setAppMode);
@@ -73,9 +68,7 @@ export function SimulationPanel() {
   const verifyLoading = useSimulationStore((s) => s.verifyLoading);
   const comparisonResult = useSimulationStore((s) => s.comparisonResult);
 
-  // Local state
-  const [severityFilter, setSeverityFilter] = useState<string>('all');
-  const [securitySubTab, setSecuritySubTab] = useState<'findings' | 'attack_paths'>('findings');
+  // Ping & Diagnostic Local State
   const [pingSource, setPingSource] = useState<string>('');
   const [pingDest, setPingDest] = useState<string>('');
   const [portScanSource, setPortScanSource] = useState<string>('');
@@ -94,21 +87,6 @@ export function SimulationPanel() {
   const [defenseActionSummary, setDefenseActionSummary] = useState<string>(
     'Enforce default-deny firewall ACL & WAF query parameterization'
   );
-
-  const findings = scanResult?.findings || [];
-  const attackPaths = scanResult?.attack_paths || [];
-
-  const filteredFindings = findings.filter((f) => {
-    if (severityFilter === 'all') return true;
-    return f.severity === severityFilter;
-  });
-
-  const severityCounts = {
-    critical: findings.filter((f) => f.severity === 'critical').length,
-    high: findings.filter((f) => f.severity === 'high').length,
-    medium: findings.filter((f) => f.severity === 'medium').length,
-    low: findings.filter((f) => f.severity === 'low').length,
-  };
 
   // Endpoint nodes eligible for ping and scan
   const pingableNodes = nodes.filter((n) => {
@@ -176,6 +154,12 @@ export function SimulationPanel() {
         source_vlan: 10,
         target_vlan: 20,
       };
+    } else if (selectedScenario === 'syn_flood_dos') {
+      parameters = {
+        port: parseInt(attackPorts.split(',')[0]?.trim() || '80', 10) || 80,
+      };
+    } else if (selectedScenario === 'arp_cache_poisoning') {
+      parameters = {};
     }
 
     try {
@@ -370,10 +354,17 @@ export function SimulationPanel() {
           </button>
 
           {/* Mode Pill Indicator */}
-          <div className="hidden md:flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-950/50 border border-emerald-800/60 text-emerald-400 text-[11px] font-semibold mr-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Simulator Mode</span>
-          </div>
+          {appMode === 'attack' ? (
+            <div className="hidden md:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-950/70 border border-[#FF3B4E]/40 text-[#FF3B4E] text-[11px] font-bold mr-2 shadow-sm">
+              <Flame size={12} className="animate-pulse" />
+              <span>OFFENSIVE MODE</span>
+            </div>
+          ) : (
+            <div className="hidden md:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-950/70 border border-[#3B82F6]/40 text-[#60A5FA] text-[11px] font-bold mr-2 shadow-sm">
+              <ShieldCheck size={12} />
+              <span>DEFENSIVE MODE</span>
+            </div>
+          )}
 
           {/* Tab 0: Attack Launcher */}
           <button
@@ -400,7 +391,7 @@ export function SimulationPanel() {
             )}
           </button>
 
-          {/* Tab 0.5: Verify Defense */}
+          {/* Tab 1: Verify Defense */}
           <button
             type="button"
             onClick={() => setBottomTab('defense_verify')}
@@ -421,25 +412,6 @@ export function SimulationPanel() {
                 }`}
               >
                 {comparisonResult.defense_effective ? 'DEFENDED' : 'VULNERABLE'}
-              </span>
-            )}
-          </button>
-
-          {/* Tab 1: Security Scan */}
-          <button
-            type="button"
-            onClick={() => setBottomTab('security')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-              bottomTab === 'security' && panelOpen
-                ? 'bg-[#FF3B4E]/15 text-[#FF3B4E] border border-[#FF3B4E]/30 font-semibold'
-                : 'text-[#9BA5B5] hover:text-[#F3F5F8] hover:bg-[#11151D]'
-            }`}
-          >
-            <ShieldAlert size={14} className={bottomTab === 'security' && panelOpen ? 'text-[#FF3B4E]' : ''} />
-            <span>Security Scan</span>
-            {findings.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-[#FF3B4E] text-white text-[10px] font-bold">
-                {findings.length}
               </span>
             )}
           </button>
@@ -538,17 +510,7 @@ export function SimulationPanel() {
             </Button>
           )}
 
-          {bottomTab === 'security' && (
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={runScan}
-              loading={scanning}
-              icon={<Play size={13} />}
-            >
-              {scanning ? 'Scanning...' : 'Run Scan'}
-            </Button>
-          )}
+
 
           {bottomTab === 'simulation' && (
             <div className="flex items-center gap-2">
@@ -620,6 +582,8 @@ export function SimulationPanel() {
                     <option value="traffic_analysis">Traffic Sniffing: Cleartext Tokens & PCAP Capture</option>
                     <option value="web_security_injection">Web Security: OWASP SQLi / XSS Attack</option>
                     <option value="firewall_segmentation">Segmentation: Cross-VLAN Lateral Movement</option>
+                    <option value="syn_flood_dos">Denial of Service: TCP SYN Flood Attack</option>
+                    <option value="arp_cache_poisoning">L2 Poisoning: ARP Cache Spoofing & Redirection</option>
                   </select>
                 </div>
 
@@ -647,6 +611,19 @@ export function SimulationPanel() {
                       type="text"
                       value={attackPorts}
                       onChange={(e) => setAttackPorts(e.target.value)}
+                      className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1 text-xs text-[#F3F5F8] font-mono focus:border-[#FF3B4E] focus:outline-none"
+                    />
+                  </div>
+                )}
+
+                {selectedScenario === 'syn_flood_dos' && (
+                  <div>
+                    <label className="text-[11px] font-medium text-[#9BA5B5] block mb-1">Target Service Port</label>
+                    <input
+                      type="text"
+                      value={attackPorts}
+                      onChange={(e) => setAttackPorts(e.target.value)}
+                      placeholder="80"
                       className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1 text-xs text-[#F3F5F8] font-mono focus:border-[#FF3B4E] focus:outline-none"
                     />
                   </div>
@@ -997,101 +974,7 @@ export function SimulationPanel() {
             </div>
           )}
 
-          {/* ----------------- TAB 1: SECURITY SCAN ----------------- */}
-          {bottomTab === 'security' && (
-            <div className="flex-1 flex flex-col overflow-hidden">
-              {scanning ? (
-                <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-6">
-                  <Loader2 size={32} className="animate-spin text-[#FF3B4E]" />
-                  <div>
-                    <p className="text-sm font-semibold text-[#F3F5F8]">Evaluating Security Policies</p>
-                    <p className="text-xs text-[#9BA5B5] mt-1">
-                      Analyzing network topology, firewalls, exposed ports, and attack paths...
-                    </p>
-                  </div>
-                </div>
-              ) : !scanResult ? (
-                <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-6">
-                  <ShieldCheck size={36} className="text-[#9BA5B5]/60" />
-                  <div>
-                    <p className="text-sm font-semibold text-[#F3F5F8]">No Scan Executed Yet</p>
-                    <p className="text-xs text-[#9BA5B5] mt-1 max-w-sm">
-                      Run a network security scan to evaluate open services, firewall filtering, and attack paths.
-                    </p>
-                  </div>
-                  <Button variant="primary" size="sm" onClick={runScan} icon={<Play size={13} />}>
-                    Run Security Scan
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center gap-4 px-4 border-b border-[#293140] bg-[#11151D] text-xs">
-                    <button
-                      type="button"
-                      onClick={() => setSecuritySubTab('findings')}
-                      className={`py-2 px-1 font-semibold border-b-2 transition-colors ${
-                        securitySubTab === 'findings'
-                          ? 'border-[#FF3B4E] text-[#F3F5F8]'
-                          : 'border-transparent text-[#9BA5B5] hover:text-[#F3F5F8]'
-                      }`}
-                    >
-                      Security Findings ({findings.length})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSecuritySubTab('attack_paths')}
-                      className={`py-2 px-1 font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${
-                        securitySubTab === 'attack_paths'
-                          ? 'border-[#FF3B4E] text-[#F3F5F8]'
-                          : 'border-transparent text-[#9BA5B5] hover:text-[#F3F5F8]'
-                      }`}
-                    >
-                      <Crosshair size={13} className="text-[#FF3B4E]" />
-                      Attack Paths ({attackPaths.length})
-                    </button>
 
-                    <div className="ml-auto flex items-center gap-2">
-                      <span className="text-[11px] text-[#9BA5B5]">Severity:</span>
-                      {(['all', 'critical', 'high', 'medium', 'low'] as const).map((sev) => (
-                        <button
-                          key={sev}
-                          type="button"
-                          onClick={() => setSeverityFilter(sev)}
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${
-                            severityFilter === sev
-                              ? 'bg-[#FF3B4E]/20 text-[#FF3B4E] border-[#FF3B4E]'
-                              : 'bg-[#171C26] text-[#9BA5B5] border-[#293140]'
-                          }`}
-                        >
-                          {sev.toUpperCase()}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                    {securitySubTab === 'findings' ? (
-                      filteredFindings.length === 0 ? (
-                        <div className="text-center py-8 text-xs text-[#9BA5B5]">
-                          No security issues matching the selected filters.
-                        </div>
-                      ) : (
-                        filteredFindings.map((finding, idx) => (
-                          <FindingCard
-                            key={`${finding.rule_id}-${finding.affected_resource_id}-${idx}`}
-                            finding={finding}
-                            onSelectResource={(id) => selectNode(id)}
-                          />
-                        ))
-                      )
-                    ) : (
-                      <AttackPathView attackPaths={attackPaths} onSelectResource={(id) => selectNode(id)} />
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
 
           {/* ----------------- TAB 2: NETWORK SIMULATION ----------------- */}
           {bottomTab === 'simulation' && (

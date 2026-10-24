@@ -55,7 +55,7 @@ export const useSimulationStore = create<SimulationStore>((set) => ({
   attackResponse: null,
   verifyLoading: false,
   comparisonResult: null,
-  bottomTab: 'security',
+  bottomTab: 'attack',
   panelOpen: false,
 
   setBottomTab: (tab: BottomTab) => {

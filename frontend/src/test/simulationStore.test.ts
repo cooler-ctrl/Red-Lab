@@ -26,7 +26,7 @@ describe('SimulationStore', () => {
       validating: false,
       pingLoading: false,
       pingEvents: [],
-      bottomTab: 'security',
+      bottomTab: 'attack',
       panelOpen: false,
       attackLoading: false,
       attackResponse: null,

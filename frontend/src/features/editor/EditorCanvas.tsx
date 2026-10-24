@@ -4,6 +4,7 @@ import {
   Background,
   Controls,
   MiniMap,
+  addEdge,
   type Connection,
   type Edge,
   type Node,
@@ -33,83 +34,21 @@ const ROUTER_TYPES: Set<ResourceType> = new Set(['router', 'layer3_switch']);
 const SECURITY_TYPES: Set<ResourceType> = new Set(['firewall', 'ids_ips']);
 const WAN_TYPES: Set<ResourceType> = new Set(['external_network']);
 
-function getValidRelationship(typeA: ResourceType, typeB: ResourceType): {
+function getValidRelationship(typeA?: ResourceType, typeB?: ResourceType): {
   isValid: boolean;
   sourceType?: ResourceType;
   targetType?: ResourceType;
   relationshipType?: string;
   isReversed?: boolean;
 } {
-  // Direct device matches
-  const isHostA = HOST_TYPES.has(typeA);
-  const isHostB = HOST_TYPES.has(typeB);
-  const isSwitchA = SWITCH_TYPES.has(typeA);
-  const isSwitchB = SWITCH_TYPES.has(typeB);
-  const isRouterA = ROUTER_TYPES.has(typeA);
-  const isRouterB = ROUTER_TYPES.has(typeB);
-  const isSecurityA = SECURITY_TYPES.has(typeA);
-  const isSecurityB = SECURITY_TYPES.has(typeB);
-  const isWanA = WAN_TYPES.has(typeA);
-  const isWanB = WAN_TYPES.has(typeB);
-
-  // Host <-> Switch
-  if ((isHostA && isSwitchB) || (isHostB && isSwitchA)) {
-    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
-  }
-  // Host <-> Router
-  if ((isHostA && isRouterB) || (isHostB && isRouterA)) {
-    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
-  }
-  // Host <-> Security (Firewall / IDS)
-  if ((isHostA && isSecurityB) || (isHostB && isSecurityA)) {
-    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
-  }
-  // Host <-> Host (Direct peer cross-over link)
-  if (isHostA && isHostB) {
-    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
-  }
-  // Host <-> WAN
-  if ((isHostA && isWanB) || (isHostB && isWanA)) {
-    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
-  }
-  // Switch <-> Switch (Trunk / Uplink)
-  if (isSwitchA && isSwitchB) {
-    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
-  }
-  // Switch <-> Router (Gateway uplink)
-  if ((isSwitchA && isRouterB) || (isSwitchB && isRouterA)) {
-    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
-  }
-  // Switch <-> Security
-  if ((isSwitchA && isSecurityB) || (isSwitchB && isSecurityA)) {
-    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
-  }
-  // Switch <-> WAN
-  if ((isSwitchA && isWanB) || (isSwitchB && isWanA)) {
-    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
-  }
-  // Router <-> Router
-  if (isRouterA && isRouterB) {
-    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
-  }
-  // Router <-> Security
-  if ((isRouterA && isSecurityB) || (isRouterB && isSecurityA)) {
-    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
-  }
-  // Router <-> WAN
-  if ((isRouterA && isWanB) || (isRouterB && isWanA)) {
-    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
-  }
-  // Security <-> Security
-  if (isSecurityA && isSecurityB) {
-    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
-  }
-  // Security <-> WAN
-  if ((isSecurityA && isWanB) || (isSecurityB && isWanA)) {
-    return { isValid: true, sourceType: typeA, targetType: typeB, relationshipType: 'connects', isReversed: false };
-  }
-
-  return { isValid: false };
+  // In computer networking, all devices can be interconnected via Layer 1/2/3 cabling
+  return {
+    isValid: true,
+    sourceType: typeA,
+    targetType: typeB,
+    relationshipType: 'connects',
+    isReversed: false,
+  };
 }
 
 function CanvasInner() {
@@ -171,57 +110,55 @@ function CanvasInner() {
 
   const onConnect = useCallback(
     (connection: Connection) => {
+      if (!connection.source || !connection.target) return;
+      if (connection.source === connection.target) {
+        toast('Cannot connect a device to itself', 'warning');
+        return;
+      }
+
       const sourceNode = nodes.find((n) => n.id === connection.source);
       const targetNode = nodes.find((n) => n.id === connection.target);
-
       if (!sourceNode || !targetNode) return;
 
       const sourceData = sourceNode.data as ResourceNodeData;
       const targetData = targetNode.data as ResourceNodeData;
 
-      const typeA = sourceData.resourceType;
-      const typeB = targetData.resourceType;
+      const typeA = sourceData?.resourceType;
+      const typeB = targetData?.resourceType;
 
       const rel = getValidRelationship(typeA, typeB);
 
-      if (!rel.isValid) {
-        toastError(
-          `Invalid connection: cannot link ${typeA} with ${typeB}. Connect endpoints (PC/Server) to Switches, Routers, or Firewalls.`
-        );
-        return;
-      }
-
-      // Canonical source & target
-      const canonicalSourceId = rel.isReversed ? targetNode.id : sourceNode.id;
-      const canonicalTargetId = rel.isReversed ? sourceNode.id : targetNode.id;
-      const relationshipType = rel.relationshipType || 'connects';
-
-      // Check if duplicate edge exists
+      // Check if duplicate edge exists in either direction
       const existing = edges.find(
-        (e) => e.source === canonicalSourceId && e.target === canonicalTargetId
+        (e) =>
+          (e.source === connection.source && e.target === connection.target) ||
+          (e.source === connection.target && e.target === connection.source)
       );
       if (existing) {
-        toast('Connection already exists', 'info');
+        toast('Connection already exists between these devices', 'info');
         return;
       }
 
-      const edgeId = `e-${canonicalSourceId}-${canonicalTargetId}`;
+      const edgeId = `e-${connection.source}-${connection.target}-${Date.now().toString(36)}`;
       const newEdge: Edge = {
         id: edgeId,
-        source: canonicalSourceId,
-        target: canonicalTargetId,
+        source: connection.source,
+        target: connection.target,
+        sourceHandle: connection.sourceHandle || 'right',
+        targetHandle: connection.targetHandle || 'left',
+        type: 'smoothstep',
         animated: true,
         style: { stroke: appMode === 'attack' ? '#FF3B4E' : '#3B82F6', strokeWidth: 2 },
         data: {
-          relationship_type: relationshipType,
+          relationship_type: rel.relationshipType || 'connects',
           metadata: {},
         },
       };
 
-      setEdges([...edges, newEdge]);
-      toastSuccess(`Connected ${rel.sourceType} <-> ${rel.targetType}`);
+      setEdges(addEdge(newEdge, edges));
+      toastSuccess(`Connected ${sourceData.label || typeA} <-> ${targetData.label || typeB}`);
     },
-    [nodes, edges, setEdges, toastError, toastSuccess, toast]
+    [nodes, edges, setEdges, appMode, toastSuccess, toast]
   );
 
   const onNodeClick = useCallback(
@@ -248,7 +185,10 @@ function CanvasInner() {
         onDragOver={onDragOver}
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
-        fitView
+        isValidConnection={(c) => c.source !== c.target}
+        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+        minZoom={0.2}
+        maxZoom={2}
         className="dark-flow"
         proOptions={{ hideAttribution: true }}
       >

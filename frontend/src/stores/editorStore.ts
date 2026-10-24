@@ -68,6 +68,7 @@ export function graphToFlowEdges(graphEdges: GraphEdge[]): Edge[] {
     id: ge.id,
     source: ge.source,
     target: ge.target,
+    type: 'smoothstep',
     animated: true,
     style: { stroke: '#FF3B4E', strokeWidth: 2 },
     data: {

@@ -202,12 +202,12 @@ export function DashboardPage() {
 
               <div className="space-y-1.5 p-3.5 rounded-lg bg-[#171C26] border border-[#293140]">
                 <div className="w-7 h-7 rounded-md bg-[#FF3B4E]/15 border border-[#FF3B4E]/30 flex items-center justify-center text-[#FF3B4E] mb-2">
-                  <ShieldAlert size={16} />
+                  <Flame size={16} />
                 </div>
-                <h3 className="font-semibold text-[#F3F5F8]">3. Scan & Simulate Attacks</h3>
+                <h3 className="font-semibold text-[#F3F5F8]">3. Offensive vs Defensive Mode</h3>
                 <p className="text-[#9BA5B5] leading-relaxed">
-                  Execute TCP SYN port scans, discover open services, evaluate firewall filtering, and
-                  trace multi-hop network kill chains and lateral attack paths.
+                  Switch between Offensive Mode (launch SYN floods, SSH brute force, and port scans) and
+                  Defensive Mode (harden ACLs, block exploits, and verify defenses).
                 </p>
               </div>
             </div>

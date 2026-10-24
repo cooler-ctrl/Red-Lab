@@ -752,6 +752,122 @@ def simulate_segmentation_test(
         return events, "blocked", {"isolated": True, "enforced_by": reach.blocked_by}
 
 
+def simulate_syn_flood(
+    graph: GraphData,
+    run_id: str,
+    source_id: str,
+    dest_id: str,
+    target_port: int = 80,
+) -> tuple[list[NetworkEvent], str, dict]:
+    events: list[NetworkEvent] = []
+    src = next((n for n in graph.nodes if n.id == source_id), None)
+    dst = next((n for n in graph.nodes if n.id == dest_id), None)
+    if not src or not dst:
+        return events, "failed", {}
+
+    src_ip, _ = _get_node_ip_and_prefix(src)
+    dst_ip, _ = _get_node_ip_and_prefix(dst)
+
+    events.append(_make_event(
+        run_id=run_id,
+        event_type="dos_syn_flood_initiated",
+        summary=f"High-frequency TCP SYN packet flood launched from {src.label} ({src_ip}) toward {dst.label}:{target_port}.",
+        src=src, dst=dst,
+        protocol="tcp",
+        detail={"rate_pps": 15000, "flag": "SYN", "target_port": target_port},
+    ))
+
+    reach = evaluate_connectivity(graph, source_id, dest_id)
+    if not reach.reachable:
+        events.append(_make_event(
+            run_id=run_id,
+            event_type="dos_packets_dropped",
+            summary=f"DEFENSE ACTIVE: Perimeter firewall rule intercepted and dropped flooded SYN packets before reaching {dst.label}.",
+            src=src, dst=dst,
+            protocol="tcp",
+            detail={"blocked_by": reach.blocked_by, "reason": reach.reason},
+        ))
+        return events, "blocked", {"mitigated_by": reach.blocked_by or "Firewall ACL", "syn_backlog_intact": True}
+
+    fw_nodes = [n for n in graph.nodes if n.type == "firewall"]
+    has_rate_limit = False
+    for fw in fw_nodes:
+        cfg = fw.config or {}
+        if cfg.get("syn_flood_protection") or cfg.get("rate_limiting"):
+            has_rate_limit = True
+            break
+
+    if has_rate_limit:
+        events.append(_make_event(
+            run_id=run_id,
+            event_type="dos_rate_limited",
+            summary=f"DEFENSE ACTIVE: Firewall SYN Proxy / Rate Limiting activated. SYN cookie verification succeeded; queue protected.",
+            src=src, dst=dst,
+            protocol="tcp",
+            detail={"syn_cookies": True, "dropped_spurious_syns": 14950},
+        ))
+        return events, "blocked", {"mitigated_by": "SYN Cookies / Rate Limiter", "uptime": "100%"}
+    else:
+        events.append(_make_event(
+            run_id=run_id,
+            event_type="dos_service_exhausted",
+            summary=f"EXPLOIT CONFIRMED: Half-open TCP connection backlog on {dst.label}:{target_port} fully exhausted! Legitimate connections dropped.",
+            src=src, dst=dst,
+            protocol="tcp",
+            detail={"backlog_utilization": "100%", "impact": "Service Outage / DoS"},
+        ))
+        return events, "compromised", {"service_exhausted": True, "dropped_legitimate_connections": 120}
+
+
+def simulate_arp_poisoning(
+    graph: GraphData,
+    run_id: str,
+    source_id: str,
+    dest_id: str,
+) -> tuple[list[NetworkEvent], str, dict]:
+    events: list[NetworkEvent] = []
+    src = next((n for n in graph.nodes if n.id == source_id), None)
+    dst = next((n for n in graph.nodes if n.id == dest_id), None)
+    if not src or not dst:
+        return events, "failed", {}
+
+    src_ip, _ = _get_node_ip_and_prefix(src)
+    dst_ip, _ = _get_node_ip_and_prefix(dst)
+
+    events.append(_make_event(
+        run_id=run_id,
+        event_type="arp_spoof_broadcast",
+        summary=f"Attacker {src.label} ({src_ip}) broadcasting forged gratuitous ARP replies: asserting {dst_ip} is at rogue MAC 02:42:AC:11:00:99.",
+        src=src, dst=dst,
+        protocol="arp",
+        detail={"spoofed_ip": dst_ip, "fake_mac": "02:42:AC:11:00:99"},
+    ))
+
+    switches = [n for n in graph.nodes if n.type == "switch"]
+    dai_enabled = any((s.config or {}).get("dai_enabled") or (s.config or {}).get("port_security") for s in switches)
+
+    if dai_enabled:
+        events.append(_make_event(
+            run_id=run_id,
+            event_type="arp_inspection_drop",
+            summary=f"DEFENSE ACTIVE: Access switch Dynamic ARP Inspection (DAI) rejected conflicting ARP packet. Binding table preserved.",
+            src=src, dst=dst,
+            protocol="arp",
+            detail={"defense": "Dynamic ARP Inspection (DAI)", "port_status": "Secure"},
+        ))
+        return events, "blocked", {"mitigated_by": "Dynamic ARP Inspection (DAI)", "cache_poisoned": False}
+    else:
+        events.append(_make_event(
+            run_id=run_id,
+            event_type="arp_cache_overwritten",
+            summary=f"EXPLOIT CONFIRMED: Local ARP cache poisoned! LAN traffic destined for {dst_ip} is redirected through attacker {src.label}.",
+            src=src, dst=dst,
+            protocol="arp",
+            detail={"mitm_established": True, "impact": "Traffic Interception / Credentials Sniffing"},
+        ))
+        return events, "compromised", {"arp_cache_poisoned": True, "mitm_active": True}
+
+
 # ---------------------------------------------------------------------------
 # High-Level Scenario Runner & Verification
 # ---------------------------------------------------------------------------
@@ -781,6 +897,16 @@ SCENARIO_METADATA = {
         "title": "Firewall & Network Segmentation Testing",
         "takeaway": "Flat networks allow an attacker with a single compromised workstation to move laterally to servers.",
         "remediation": "Isolate critical servers in dedicated VLANs and enforce strict inter-VLAN firewall filtering.",
+    },
+    "syn_flood_dos": {
+        "title": "Denial of Service (DoS): TCP SYN Flood",
+        "takeaway": "Unprotected TCP endpoints are vulnerable to SYN queue exhaustion, denying access to legitimate clients.",
+        "remediation": "Enable TCP SYN cookies on the OS and deploy firewall connection rate limiting.",
+    },
+    "arp_cache_poisoning": {
+        "title": "Layer 2 Man-in-the-Middle: ARP Cache Spoofing",
+        "takeaway": "Unauthenticated ARP requests allow attackers on the local segment to intercept or modify in-transit frames.",
+        "remediation": "Enable Dynamic ARP Inspection (DAI) and DHCP Snooping on all access layer switches.",
     },
 }
 
@@ -840,6 +966,13 @@ def execute_attack_scenario(
 
     elif sid == "firewall_segmentation":
         events, outcome, evidence = simulate_segmentation_test(graph, run_id, attacker.id, target.id)
+
+    elif sid == "syn_flood_dos":
+        target_port = int(request.parameters.get("port", 80))
+        events, outcome, evidence = simulate_syn_flood(graph, run_id, attacker.id, target.id, target_port=target_port)
+
+    elif sid == "arp_cache_poisoning":
+        events, outcome, evidence = simulate_arp_poisoning(graph, run_id, attacker.id, target.id)
 
     else:
         # Generic port scan fallback

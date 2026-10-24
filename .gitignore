@@ -20,6 +20,7 @@ backend/redlab.db-journal
 # PyInstaller & Desktop Builds
 backend/build/
 backend/dist/
+desktop/build/
 desktop/node_modules/
 desktop/dist/
 desktop/dist-backend/

@@ -4,9 +4,9 @@ import {
   Copy,
   Edit2,
   ExternalLink,
+  Flame,
   Layers,
   MoreVertical,
-  ShieldAlert,
   ShieldCheck,
   Trash2,
 } from 'lucide-react';
@@ -67,26 +67,10 @@ export function LabCard({ lab, onOpen, onRename, onDuplicate, onDelete }: LabCar
               <span>{lab.node_count || lab.graph_data?.nodes?.length || 0} nodes</span>
             </span>
 
-            {lab.last_scan_status ? (
-              <span
-                className={`flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border ${
-                  lab.last_scan_status === 'passed'
-                    ? 'bg-[#34D399]/10 text-[#34D399] border-[#34D399]/30'
-                    : 'bg-[#FF3B4E]/10 text-[#FF3B4E] border-[#FF3B4E]/30'
-                }`}
-              >
-                {lab.last_scan_status === 'passed' ? (
-                  <ShieldCheck size={11} />
-                ) : (
-                  <ShieldAlert size={11} />
-                )}
-                <span className="capitalize">{lab.last_scan_status}</span>
-              </span>
-            ) : (
-              <span className="text-[11px] text-[#9BA5B5]/60 bg-[#11151D] px-2 py-0.5 rounded-full border border-[#293140]">
-                Unscanned
-              </span>
-            )}
+            <span className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#FF3B4E]/10 text-[#FF3B4E] border border-[#FF3B4E]/30">
+              <Flame size={11} />
+              <span>Attack & Defend Lab</span>
+            </span>
           </div>
 
           <div className="relative">
