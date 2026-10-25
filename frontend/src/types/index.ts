@@ -380,3 +380,13 @@ export interface AttackExecutionResponse {
   comparison?: BeforeAfterComparison | null;
 }
 
+export interface PortForensicsEntry {
+  port: number;
+  service: string;
+  state: 'open' | 'closed' | 'filtered';
+  who_closed: string;
+  how_it_closed: string;
+  attacker_takeaway: string;
+  defender_advice: string;
+  remediation: string;
+}

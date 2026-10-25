@@ -29,6 +29,7 @@ export function LinuxTerminal() {
   const executeAttack = useSimulationStore((s) => s.executeAttack);
   const runPing = useSimulationStore((s) => s.runPing);
   const runPortScan = useSimulationStore((s) => s.runPortScan);
+  const attackResponse = useSimulationStore((s) => s.attackResponse);
 
   const getNodeConfig = (node?: any): Record<string, any> => {
     return ((node?.data as ResourceNodeData)?.config || {}) as Record<string, any>;
@@ -169,6 +170,9 @@ export function LinuxTerminal() {
           appendLine('output', '    iptables -L -n                - Display active firewall filter rules');
           appendLine('output', '    netstat -tuln | ss -tuln      - Display open listening ports on host');
           appendLine('output', '    hosts | cat /etc/hosts        - Show all known devices and IPs in lab');
+          appendLine('info', '  [Educational Forensics & Monitor]');
+          appendLine('output', '    forensics | ports             - Learn why ports got closed/filtered & who decided');
+          appendLine('output', '    screen | victim | monitor     - Inspect simulated victim hacked screen & outage');
           appendLine('output', '    clear                         - Clear terminal screen');
           appendLine('info', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
           break;
@@ -287,6 +291,27 @@ export function LinuxTerminal() {
           const targetCfg = getNodeConfig(targetNode);
           const targetIp = String(targetCfg.ip_address || targetStr);
 
+          // Check if target is overwhelmed by active SYN flood / DDoS
+          const isDdosDown =
+            attackResponse?.scenario_id === 'syn_flood_dos' &&
+            attackResponse?.outcome === 'compromised' &&
+            (targetNode?.id === attackResponse.target_id ||
+              targetIp === attackResponse.target_id ||
+              (targetNode && attackResponse.target_id.includes(targetNode.id)));
+
+          if (isDdosDown) {
+            appendLine('output', `PING ${targetIp} (${targetIp}) 56(84) bytes of data.`);
+            appendLine('error', `Request timeout for icmp_seq 1 (Host unresponsive: TCP SYN backlog queue 100% full)`);
+            appendLine('error', `Request timeout for icmp_seq 2 (OS kernel dropping ingress packets under DoS flood)`);
+            appendLine('error', `Request timeout for icmp_seq 3 (Socket allocation table exhausted - kernel packet queue full)`);
+            appendLine('error', `Request timeout for icmp_seq 4 (HTTP 504 Gateway Timeout / No route to host)`);
+            appendLine('info', `--- ${targetIp} ping statistics ---`);
+            appendLine('error', `4 packets transmitted, 0 received, 100% packet loss!`);
+            appendLine('error', `[ALERT: TARGET SERVICE DOWN] Web service overwhelmed by Denial-of-Service.`);
+            appendLine('info', `💡 Learning: Under SYN Flood, legitimate packets and ping ICMP are dropped. Switch to DEFENSE mode to deploy SYN cookies or rate limiting.`);
+            break;
+          }
+
           appendLine('output', `PING ${targetIp} (${targetIp}) 56(84) bytes of data.`);
           if (lab && targetNode) {
             try {
@@ -359,9 +384,66 @@ export function LinuxTerminal() {
                 });
               }
               appendLine('info', `Nmap done: 1 IP address (1 host up) scanned in 0.42 seconds`);
+              appendLine('info', `💡 Forensics Note: Closed ports returned TCP RST (Kernel); Filtered ports were dropped by Firewall.`);
+              appendLine('output', `   Type "forensics" to learn who closed each port, packet flow, and how to defend.`);
             } catch (err) {
               appendLine('error', `Nmap execution error: ${(err as Error).message}`);
             }
+          }
+          break;
+        }
+
+        // EDUCATIONAL PORT FORENSICS COMMAND
+        case 'forensics':
+        case 'ports':
+        case 'portinfo': {
+          appendLine('info', '━━━━━━━━━━━━━━━━━━━ PORT STATE & FORENSICS KNOWLEDGE BASE ━━━━━━━━━━━━━━━━━━━');
+          appendLine('output', 'Educational explanation of why ports are Open, Closed, or Filtered:');
+          appendLine('output', '');
+          appendLine('success', '● OPEN (TCP SYN-ACK received):');
+          appendLine('output', '  • Decided by: Active application daemon (e.g. Apache/Nginx on 80, OpenSSH on 22)');
+          appendLine('output', '  • Packet Exchange: Client sends SYN -> Server responds SYN-ACK -> Port is live.');
+          appendLine('output', '  • Defender Action: If unintended, stop the service daemon or restrict access with ACLs.');
+          appendLine('output', '');
+          appendLine('error', '● CLOSED (TCP RST packet received):');
+          appendLine('output', '  • Decided by: Target Operating System Kernel TCP/IP stack.');
+          appendLine('output', '  • Packet Exchange: Client sends SYN -> Kernel has NO listening process -> Sends TCP RST/ACK.');
+          appendLine('output', '  • Attacker Takeaway: Host is ALIVE & reachable, but this specific application is not running.');
+          appendLine('output', '  • Defender Action: Perfectly normal if the service is not needed. To conceal host presence, drop packets instead.');
+          appendLine('output', '');
+          appendLine('info', '● FILTERED (No response / Timeout or ICMP Admin Prohibited):');
+          appendLine('output', '  • Decided by: Perimeter Firewall or Host iptables filter rule.');
+          appendLine('output', '  • Packet Exchange: Client sends SYN -> Firewall DROP rule silently discards packet -> Client times out.');
+          appendLine('output', '  • Attacker Takeaway: Cannot tell whether the port or even the host is online.');
+          appendLine('output', '  • Defender Action: Best security practice for non-public management ports (SSH, MySQL).');
+          appendLine('info', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          break;
+        }
+
+        // SIMULATED VICTIM SCREEN COMMAND
+        case 'screen':
+        case 'victim':
+        case 'monitor': {
+          if (!attackResponse) {
+            appendLine('info', 'Target victim screen is currently in NORMAL operating state.');
+            appendLine('output', 'Run an attack scenario or click "🖥️ View Target Victim Screen" on the Attack Studio panel.');
+          } else {
+            const victimState = String(attackResponse.evidence?.victim_screen_state || 'normal');
+            appendLine('info', `Target Device Screen State: [${victimState.toUpperCase()}]`);
+            appendLine('output', `Target ID: ${attackResponse.target_id} | Outcome: ${attackResponse.outcome}`);
+            if (victimState === 'ddos_outage') {
+              appendLine('error', `Monitor shows: "504 GATEWAY TIMEOUT — Service Unavailable (DDoS Outage)"`);
+              appendLine('output', `HTTP Traffic: 0 replies received, SYN backlog queue saturated at 100%.`);
+            } else if (victimState === 'defaced_sqli') {
+              appendLine('error', `Monitor shows: "HACKED BY REDLAB TEAM — DATABASE EXPOSED (admin table dumped)"`);
+              appendLine('output', `Exposed: Users database with 25 plaintext hashes leaked.`);
+            } else if (victimState === 'hacked_root_terminal') {
+              appendLine('error', `Monitor shows: "UNAUTHORIZED ROOT TTY1 SESSION ESTABLISHED — /etc/shadow leaked"`);
+              appendLine('output', `Compromise: Reverse shell active on port 4444.`);
+            } else {
+              appendLine('success', `Monitor shows: Normal healthy system monitor (200 OK / Secure).`);
+            }
+            appendLine('info', 'Click "🖥️ View Target Victim Screen" on the Attack Studio panel to inspect the visual hacked screen.');
           }
           break;
         }

@@ -951,34 +951,108 @@ def execute_attack_scenario(
         events = simulate_port_scan(graph, run_id, attacker.id, target.id, ports)
         has_open = any(e.event_type == "port_scan_open" for e in events)
         outcome = "compromised" if has_open else "blocked"
-        evidence = {"scanned_ports": ports, "open_found": has_open}
+
+        port_forensics = []
+        for p in ports:
+            p_evt = next((e for e in events if e.detail and e.detail.get("port") == p), None)
+            state = "closed"
+            if p_evt:
+                if p_evt.event_type == "port_scan_open":
+                    state = "open"
+                elif p_evt.event_type in ("port_scan_filtered", "port_scan_unreachable", "firewall_deny"):
+                    state = "filtered"
+                else:
+                    state = "closed"
+
+            service_name = {21: "FTP", 22: "SSH", 23: "Telnet", 80: "HTTP", 443: "HTTPS", 3306: "MySQL", 8080: "HTTP-Alt"}.get(p, f"Port {p}")
+
+            if state == "open":
+                who_closed = "Nobody (Port is OPEN)"
+                how_it_closed = f"Active daemon ({service_name}) is bound to 0.0.0.0:{p} on {target.label}. Returned TCP SYN-ACK handshake response."
+                attacker_takeaway = f"Vulnerable entrypoint: Attacker can probe {service_name} for software exploits, weak credentials, or protocol vulnerabilities."
+                defender_advice = "Audit listening service. If not needed, disable it. If required, restrict access via firewall IP allowlists."
+                remediation = f"To secure this port, add a Firewall DROP rule for port {p} or disable the service in Property Inspector."
+            elif state == "filtered":
+                blocked_by = p_evt.detail.get("blocked_by") if p_evt and p_evt.detail else "Perimeter Firewall"
+                rule_hit = p_evt.detail.get("rule") if p_evt and p_evt.detail else "Default Inbound DROP"
+                who_closed = f"Perimeter Firewall / ACL ({blocked_by})"
+                how_it_closed = f"Firewall intercepted TCP SYN packet and dropped it according to policy/rule: '{rule_hit}'. No packet was returned to the scanner."
+                attacker_takeaway = "Firewall detected: Scanner timed out with zero response. Attacker cannot confirm if service exists behind the firewall."
+                defender_advice = "Excellent security posture (Stealth mode). Defends against reconnaissance and port mapping."
+                remediation = f"If this port needs to be accessible, add an ALLOW rule for source IP in {blocked_by} ACL in Property Inspector."
+            else:  # closed
+                who_closed = f"Target Host Kernel ({target.label} OS)"
+                how_it_closed = f"Packet reached {target.label}, but no process was listening on port {p}. Linux TCP/IP stack returned TCP RST (Reset)."
+                attacker_takeaway = "Host is ALIVE: The packet reached the host successfully, confirming network route is open, but this socket is inactive."
+                defender_advice = "Good posture if service is unused. To prevent attackers from confirming host is alive, consider firewall filtering instead."
+                remediation = f"To open this port, go to Property Inspector for {target.label} and add the {service_name} service under Services."
+
+            port_forensics.append({
+                "port": p,
+                "service": service_name,
+                "state": state,
+                "who_closed": who_closed,
+                "how_it_closed": how_it_closed,
+                "attacker_takeaway": attacker_takeaway,
+                "defender_advice": defender_advice,
+                "remediation": remediation,
+            })
+
+        evidence = {
+            "scanned_ports": ports,
+            "open_ports": [pf["port"] for pf in port_forensics if pf["state"] == "open"],
+            "filtered_ports": [pf["port"] for pf in port_forensics if pf["state"] == "filtered"],
+            "closed_ports": [pf["port"] for pf in port_forensics if pf["state"] == "closed"],
+            "port_forensics": port_forensics,
+            "open_found": has_open,
+            "victim_screen_state": "port_recon_exposed" if has_open else "port_recon_secure",
+            "target_type": target.type,
+        }
 
     elif sid == "auth_brute_force":
         port = int(request.parameters.get("port", 22))
         events, outcome, evidence = simulate_brute_force(graph, run_id, attacker.id, target.id, port=port)
+        evidence["victim_screen_state"] = "hacked_root_terminal" if outcome == "compromised" else "ssh_login_locked"
+        evidence["target_type"] = target.type
 
     elif sid == "traffic_analysis":
         events, outcome, evidence = simulate_traffic_analysis(graph, run_id, attacker.id, target.id)
+        evidence["victim_screen_state"] = "sniffed_plaintext_credentials" if outcome == "discovered" else "encrypted_tls"
+        evidence["target_type"] = target.type
 
     elif sid == "web_security_injection":
         atk_type = request.parameters.get("attack_type", "sqli")
         events, outcome, evidence = simulate_web_attack(graph, run_id, attacker.id, target.id, attack_type=atk_type)
+        evidence["victim_screen_state"] = "defaced_sqli" if outcome == "compromised" else "waf_blocked_screen"
+        evidence["target_type"] = target.type
 
     elif sid == "firewall_segmentation":
         events, outcome, evidence = simulate_segmentation_test(graph, run_id, attacker.id, target.id)
+        evidence["victim_screen_state"] = "segmentation_breached" if outcome == "compromised" else "segmentation_isolated"
+        evidence["target_type"] = target.type
 
     elif sid == "syn_flood_dos":
         target_port = int(request.parameters.get("port", 80))
         events, outcome, evidence = simulate_syn_flood(graph, run_id, attacker.id, target.id, target_port=target_port)
+        evidence["victim_screen_state"] = "ddos_outage" if outcome == "compromised" else "ddos_mitigated_healthy"
+        evidence["target_type"] = target.type
+        evidence["ping_telemetry"] = (
+            {"packet_loss_percent": 100, "status": "Destination Host Unreachable", "latency_ms": None}
+            if outcome == "compromised"
+            else {"packet_loss_percent": 0, "status": "0.38ms RTT (Healthy)", "latency_ms": 0.38}
+        )
+        evidence["website_http_status"] = 504 if outcome == "compromised" else 200
 
     elif sid == "arp_cache_poisoning":
         events, outcome, evidence = simulate_arp_poisoning(graph, run_id, attacker.id, target.id)
+        evidence["victim_screen_state"] = "arp_mitm_hijacked" if outcome == "compromised" else "arp_protected"
+        evidence["target_type"] = target.type
 
     else:
         # Generic port scan fallback
         events = simulate_port_scan(graph, run_id, attacker.id, target.id)
         outcome = "discovered"
-        evidence = {}
+        evidence = {"target_type": target.type, "victim_screen_state": "normal"}
 
     return AttackExecutionResponse(
         run_id=run_id,

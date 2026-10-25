@@ -9,14 +9,17 @@ import {
   ChevronUp,
   Crosshair,
   Database,
+  ExternalLink,
   Flame,
   Globe,
+  HelpCircle,
   Key,
   Laptop,
   Loader2,
   Lock,
   Play,
   Radio,
+  RefreshCw,
   Search,
   Send,
   Server,
@@ -33,7 +36,9 @@ import { useSimulationStore, type BottomTab } from '../../stores/simulationStore
 import { Button } from '../../components/Button';
 import { useToast } from '../../components/Toast';
 import { LinuxTerminal } from '../terminal/LinuxTerminal';
-import type { NetworkEvent } from '../../types';
+import { CompromisedScreenModal } from './CompromisedScreenModal';
+import { PortForensicsInspector } from './PortForensicsInspector';
+import type { NetworkEvent, PortForensicsEntry } from '../../types';
 
 const ATTACK_SCENARIOS = [
   {
@@ -127,6 +132,41 @@ export function SimulationPanel() {
   const [defenseActionSummary, setDefenseActionSummary] = useState<string>(
     'Enforce default-deny firewall ACL & WAF query parameterization'
   );
+
+  // Victim Screen Modal & Educational Forensics State
+  const [screenModalOpen, setScreenModalOpen] = useState(false);
+  const [resultsSubTab, setResultsSubTab] = useState<'loot' | 'forensics'>('loot');
+  const [ddosPingTesting, setDdosPingTesting] = useState(false);
+  const [ddosPingResult, setDdosPingResult] = useState<string | null>(null);
+
+  const handleDdosPing = () => {
+    setDdosPingTesting(true);
+    setDdosPingResult(null);
+    setTimeout(() => {
+      setDdosPingTesting(false);
+      const isCompromised = attackResponse?.outcome === 'compromised';
+      if (isCompromised) {
+        setDdosPingResult(
+          `PING ${String(activeTargetData?.config?.ip_address || '10.0.0.10')}: 56 data bytes\n` +
+          `Request timeout for icmp_seq 1\n` +
+          `Request timeout for icmp_seq 2\n` +
+          `Request timeout for icmp_seq 3\n` +
+          `--- Ping Statistics ---\n` +
+          `3 packets transmitted, 0 received, 100% packet loss\n` +
+          `[FAIL]: Target web server is unresponsive due to SYN flood socket exhaustion.`
+        );
+      } else {
+        setDdosPingResult(
+          `PING ${String(activeTargetData?.config?.ip_address || '10.0.0.10')}: 56 data bytes\n` +
+          `64 bytes from target: icmp_seq=1 ttl=64 time=0.384 ms\n` +
+          `64 bytes from target: icmp_seq=2 ttl=64 time=0.412 ms\n` +
+          `--- Ping Statistics ---\n` +
+          `2 packets transmitted, 2 received, 0% packet loss\n` +
+          `[OK]: Target is online and protected by SYN cookie verification.`
+        );
+      }
+    }, 600);
+  };
 
   // Targetable nodes in the lab
   const attackableNodes = nodes.filter((n) => {
@@ -745,6 +785,26 @@ export function SimulationPanel() {
                     </div>
                   ) : (
                     <div className="space-y-2.5">
+                      {/* Simulated Victim Monitor Screen Button */}
+                      <button
+                        type="button"
+                        onClick={() => setScreenModalOpen(true)}
+                        className="w-full py-2 px-3 bg-gradient-to-r from-red-950/80 via-[#171C26] to-purple-950/80 hover:from-red-900/60 hover:to-purple-900/60 border border-[#FF3B4E]/60 rounded-lg text-xs font-bold text-[#F3F5F8] flex items-center justify-between shadow-md transition-all group"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Laptop size={14} className="text-[#FF3B4E]" />
+                          <span>🖥️ View Target Victim Screen</span>
+                          {attackResponse.outcome === 'compromised' && (
+                            <span className="px-1.5 py-0.2 rounded bg-red-600 text-white text-[9px] font-extrabold uppercase animate-pulse">
+                              HACKED
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-[#60A5FA] flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                          Open Window <ExternalLink size={12} />
+                        </span>
+                      </button>
+
                       {/* Status Banner */}
                       <div className="flex items-center justify-between p-2.5 rounded-lg bg-[#171C26] border border-[#293140]">
                         <div>
@@ -768,24 +828,105 @@ export function SimulationPanel() {
                         </span>
                       </div>
 
-                      {/* Captured Evidence & Loot Box */}
-                      <div className="p-2.5 rounded-lg bg-[#171C26] border border-[#293140] space-y-1.5">
-                        <span className="text-[10px] font-bold text-[#FF8A4C] uppercase tracking-wider block flex items-center gap-1.5">
-                          <Lock size={12} />
-                          Captured Evidence & Exploit Loot
-                        </span>
-                        <div className="bg-[#0B0D12] p-2 rounded border border-[#293140] font-mono text-[10px] space-y-1 text-[#F3F5F8]">
-                          {Object.entries(attackResponse.evidence).map(([key, val]) => (
-                            <div
-                              key={key}
-                              className="flex justify-between border-b border-[#171C26] pb-0.5"
-                            >
-                              <span className="text-[#9BA5B5]">{key}:</span>
-                              <span className="text-[#FF3B4E] font-semibold">{String(val)}</span>
-                            </div>
-                          ))}
+                      {/* Sub-tabs if Port Forensics available */}
+                      {Boolean(attackResponse.evidence?.port_forensics) && (
+                        <div className="flex items-center gap-1 bg-[#11151D] p-1 rounded-lg border border-[#293140]">
+                          <button
+                            type="button"
+                            onClick={() => setResultsSubTab('loot')}
+                            className={`flex-1 py-1 rounded text-[11px] font-bold transition-all ${
+                              resultsSubTab === 'loot'
+                                ? 'bg-[#171C26] text-[#F3F5F8] border border-[#293140]'
+                                : 'text-[#9BA5B5] hover:text-[#F3F5F8]'
+                            }`}
+                          >
+                            Captured Evidence
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setResultsSubTab('forensics')}
+                            className={`flex-1 py-1 rounded text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 ${
+                              resultsSubTab === 'forensics'
+                                ? 'bg-[#3B82F6]/20 text-[#60A5FA] border border-[#3B82F6]/40'
+                                : 'text-[#9BA5B5] hover:text-[#60A5FA]'
+                            }`}
+                          >
+                            <Search size={12} />
+                            Port Forensics (Who Closed It?)
+                          </button>
                         </div>
-                      </div>
+                      )}
+
+                      {/* Forensic View or Evidence Loot Box */}
+                      {resultsSubTab === 'forensics' && Boolean(attackResponse.evidence?.port_forensics) ? (
+                        <PortForensicsInspector
+                          entries={attackResponse.evidence.port_forensics as PortForensicsEntry[]}
+                          targetName={String(activeTargetData?.config?.name || 'Target Server')}
+                          targetIp={String(activeTargetData?.config?.ip_address || '10.0.0.10')}
+                          onOpenDefend={() => {
+                            setAppMode('defend');
+                            setBottomTab('defense_verify');
+                          }}
+                        />
+                      ) : (
+                        <div className="p-2.5 rounded-lg bg-[#171C26] border border-[#293140] space-y-1.5">
+                          <span className="text-[10px] font-bold text-[#FF8A4C] uppercase tracking-wider block flex items-center gap-1.5">
+                            <Lock size={12} />
+                            Captured Evidence & Exploit Loot
+                          </span>
+                          <div className="bg-[#0B0D12] p-2 rounded border border-[#293140] font-mono text-[10px] space-y-1 text-[#F3F5F8]">
+                            {Object.entries(attackResponse.evidence)
+                              .filter(([k]) => k !== 'port_forensics')
+                              .map(([key, val]) => (
+                                <div
+                                  key={key}
+                                  className="flex justify-between border-b border-[#171C26] pb-0.5"
+                                >
+                                  <span className="text-[#9BA5B5]">{key}:</span>
+                                  <span className="text-[#FF3B4E] font-semibold">{String(val)}</span>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Special Interactive DDoS Widget if SYN Flood */}
+                      {selectedScenario === 'syn_flood_dos' && (
+                        <div className="p-2.5 rounded-lg bg-[#171C26] border border-[#293140] space-y-2 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-[#60A5FA] uppercase tracking-wider flex items-center gap-1.5">
+                              <Radio size={12} />
+                              Interactive DDoS Website Health & Ping
+                            </span>
+                            <span
+                              className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded ${
+                                attackResponse.outcome === 'compromised'
+                                  ? 'bg-red-950 text-[#FF3B4E] border border-red-800'
+                                  : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                              }`}
+                            >
+                              {attackResponse.outcome === 'compromised' ? '504 OUTAGE' : '200 HEALTHY'}
+                            </span>
+                          </div>
+
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleDdosPing}
+                            loading={ddosPingTesting}
+                            icon={<Send size={12} />}
+                            className="w-full text-xs"
+                          >
+                            {ddosPingTesting ? 'Transmitting Ping...' : 'Transmit ICMP Ping to Test Availability'}
+                          </Button>
+
+                          {ddosPingResult && (
+                            <div className="p-2 rounded bg-[#080B10] border border-[#293140] font-mono text-[10px] text-left text-amber-300 whitespace-pre-wrap">
+                              {ddosPingResult}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* Educational Takeaway & Remediation Button */}
                       <div className="p-2.5 rounded-lg bg-[#171C26] border border-[#293140] space-y-2">
@@ -1105,6 +1246,18 @@ export function SimulationPanel() {
           )}
         </div>
       )}
+      {/* Compromised Victim Screen Modal */}
+      <CompromisedScreenModal
+        isOpen={screenModalOpen}
+        onClose={() => setScreenModalOpen(false)}
+        targetNode={activeTargetNode}
+        attackResponse={attackResponse}
+        onSwitchToDefend={() => {
+          setAppMode('defend');
+          setBottomTab('defense_verify');
+          if (activeTargetNode) selectNode(activeTargetNode.id);
+        }}
+      />
     </div>
   );
 }
