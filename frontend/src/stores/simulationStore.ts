@@ -10,7 +10,7 @@ import type {
 } from '../types';
 import { api } from '../services/api';
 
-export type BottomTab = 'security' | 'simulation' | 'traffic' | 'ping' | 'portscan' | 'attack' | 'defense_verify';
+export type BottomTab = 'attack' | 'terminal' | 'defense_verify' | 'traffic' | 'simulation' | 'ping' | 'portscan' | 'security';
 
 interface SimulationStore {
   currentRun: LabRun | null;

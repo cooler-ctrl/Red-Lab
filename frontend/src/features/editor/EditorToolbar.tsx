@@ -1,17 +1,15 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Activity,
   ArrowLeft,
   Check,
-  CheckCircle2,
   Crosshair,
   Flame,
   Layers,
   Loader2,
   Save,
-  Send,
   ShieldCheck,
+  Terminal,
 } from 'lucide-react';
 import { useEditorStore } from '../../stores/editorStore';
 import { useSimulationStore } from '../../stores/simulationStore';
@@ -30,10 +28,6 @@ export function EditorToolbar() {
   const appMode = useEditorStore((s) => s.appMode);
   const setAppMode = useEditorStore((s) => s.setAppMode);
 
-  const validateTopology = useSimulationStore((s) => s.validateTopology);
-  const startSimulation = useSimulationStore((s) => s.startSimulation);
-  const validating = useSimulationStore((s) => s.validating);
-  const runLoading = useSimulationStore((s) => s.runLoading);
   const setBottomTab = useSimulationStore((s) => s.setBottomTab);
   const setPanelOpen = useSimulationStore((s) => s.setPanelOpen);
 
@@ -46,32 +40,6 @@ export function EditorToolbar() {
       toastSuccess('Lab changes saved successfully');
     } catch {
       toastError('Failed to save lab changes');
-    }
-  };
-
-  const handleValidate = async () => {
-    if (!lab) return;
-    try {
-      await saveLab();
-      const res = await validateTopology(lab.id);
-      if (res.valid) {
-        toastSuccess('Topology is valid! No errors found.');
-      } else {
-        toastError(`Validation found ${res.errors.length} error(s). Check bottom panel.`);
-      }
-    } catch {
-      toastError('Failed to validate topology');
-    }
-  };
-
-  const handleSimulate = async () => {
-    if (!lab) return;
-    try {
-      await saveLab();
-      const run = await startSimulation(lab.id);
-      toastSuccess(`Simulation complete: ${run.events?.length || 0} packet events generated.`);
-    } catch {
-      toastError('Simulation run failed');
     }
   };
 
@@ -183,6 +151,20 @@ export function EditorToolbar() {
 
       {/* Right: Actions */}
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Linux Attack Terminal */}
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => {
+            setBottomTab('terminal');
+            setPanelOpen(true);
+          }}
+          icon={<Terminal size={14} className="text-[#34D399]" />}
+          title="Open Interactive Linux Terminal (nmap, ping, hydra, hping3, etc.)"
+        >
+          Terminal
+        </Button>
+
         {/* Mode-Specific Primary Action */}
         {appMode === 'attack' ? (
           <Button
@@ -211,44 +193,6 @@ export function EditorToolbar() {
             Verify Defenses
           </Button>
         )}
-
-        {/* Topology Validation */}
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={handleValidate}
-          loading={validating}
-          icon={<CheckCircle2 size={13} className="text-[#60A5FA]" />}
-          title="Validate IP addresses, gateways, and link connections"
-        >
-          Validate
-        </Button>
-
-        {/* Packet Flow Simulation */}
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={handleSimulate}
-          loading={runLoading}
-          icon={<Activity size={13} className="text-[#34D399]" />}
-          title="Run packet simulation across network topology"
-        >
-          Simulate
-        </Button>
-
-        {/* Quick Ping Tool */}
-        <button
-          type="button"
-          onClick={() => {
-            setBottomTab('ping');
-            setPanelOpen(true);
-          }}
-          className="flex items-center gap-1 px-2.5 py-1.5 bg-[#171C26] hover:bg-[#202736] border border-[#293140] hover:border-[#10B981] text-xs text-[#9BA5B5] hover:text-[#34D399] rounded transition-colors"
-          title="Open Ping Diagnostic Tool"
-        >
-          <Send size={13} />
-          <span className="hidden sm:inline">Ping</span>
-        </button>
 
         <div className="h-4 w-px bg-[#293140] mx-0.5" />
 

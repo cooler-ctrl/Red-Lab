@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Activity,
   AlertCircle,
@@ -8,27 +8,83 @@ import {
   ChevronDown,
   ChevronUp,
   Crosshair,
-  Filter,
+  Database,
   Flame,
+  Globe,
+  Key,
+  Laptop,
   Loader2,
   Lock,
   Play,
   Radio,
   Search,
   Send,
+  Server,
   Shield,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
-  StopCircle,
   Terminal,
   XCircle,
+  Zap,
 } from 'lucide-react';
 import { useEditorStore, type ResourceNodeData } from '../../stores/editorStore';
 import { useSimulationStore, type BottomTab } from '../../stores/simulationStore';
 import { Button } from '../../components/Button';
 import { useToast } from '../../components/Toast';
+import { LinuxTerminal } from '../terminal/LinuxTerminal';
 import type { NetworkEvent } from '../../types';
+
+const ATTACK_SCENARIOS = [
+  {
+    id: 'attack_port_scan',
+    title: 'Nmap Port Recon',
+    category: 'Reconnaissance',
+    badgeColor: 'border-purple-500/40 bg-purple-950/40 text-purple-300',
+    icon: Search,
+    description: 'Probes TCP ports (80, 22, 443, 3306) to identify running services & exposed sockets.',
+  },
+  {
+    id: 'syn_flood_dos',
+    title: 'TCP SYN Flood DoS',
+    category: 'Denial of Service',
+    badgeColor: 'border-red-500/40 bg-red-950/40 text-red-400',
+    icon: Flame,
+    description: 'Floods target device with high-volume SYN packets to exhaust TCP connection backlogs.',
+  },
+  {
+    id: 'auth_brute_force',
+    title: 'SSH Brute Force',
+    category: 'Credential Access',
+    badgeColor: 'border-amber-500/40 bg-amber-950/40 text-amber-300',
+    icon: Key,
+    description: 'Automated dictionary attack against SSH service using wordlist credentials (e.g. rockyou).',
+  },
+  {
+    id: 'web_security_injection',
+    title: 'Web SQL Injection',
+    category: 'OWASP Exploit',
+    badgeColor: 'border-pink-500/40 bg-pink-950/40 text-pink-300',
+    icon: Database,
+    description: "Injects ' OR '1'='1' into web forms to bypass authentication and dump database tables.",
+  },
+  {
+    id: 'arp_cache_poisoning',
+    title: 'ARP Cache Poisoning',
+    category: 'L2 Man-in-the-Middle',
+    badgeColor: 'border-yellow-500/40 bg-yellow-950/40 text-yellow-300',
+    icon: Zap,
+    description: 'Broadcasts forged ARP replies claiming default gateway IP to intercept subnet packets.',
+  },
+  {
+    id: 'traffic_analysis',
+    title: 'Cleartext Sniffer',
+    category: 'Traffic Analysis',
+    badgeColor: 'border-cyan-500/40 bg-cyan-950/40 text-cyan-300',
+    icon: Radio,
+    description: 'Passively sniffs network packets to extract unencrypted HTTP authentication tokens & DNS queries.',
+  },
+];
 
 export function SimulationPanel() {
   const { toast, success: toastSuccess, error: toastError } = useToast();
@@ -45,20 +101,9 @@ export function SimulationPanel() {
   const setBottomTab = useSimulationStore((s) => s.setBottomTab);
   const panelOpen = useSimulationStore((s) => s.panelOpen);
   const setPanelOpen = useSimulationStore((s) => s.setPanelOpen);
-  const currentRun = useSimulationStore((s) => s.currentRun);
-  const runLoading = useSimulationStore((s) => s.runLoading);
   const runEvents = useSimulationStore((s) => s.runEvents);
-  const validationResult = useSimulationStore((s) => s.validationResult);
-  const validating = useSimulationStore((s) => s.validating);
-  const pingLoading = useSimulationStore((s) => s.pingLoading);
   const pingEvents = useSimulationStore((s) => s.pingEvents);
-  const portScanLoading = useSimulationStore((s) => s.portScanLoading);
   const portScanEvents = useSimulationStore((s) => s.portScanEvents);
-  const validateTopology = useSimulationStore((s) => s.validateTopology);
-  const startSimulation = useSimulationStore((s) => s.startSimulation);
-  const stopSimulation = useSimulationStore((s) => s.stopSimulation);
-  const runPing = useSimulationStore((s) => s.runPing);
-  const runPortScan = useSimulationStore((s) => s.runPortScan);
 
   // Attack & Defend Store Methods
   const executeAttack = useSimulationStore((s) => s.executeAttack);
@@ -68,12 +113,7 @@ export function SimulationPanel() {
   const verifyLoading = useSimulationStore((s) => s.verifyLoading);
   const comparisonResult = useSimulationStore((s) => s.comparisonResult);
 
-  // Ping & Diagnostic Local State
-  const [pingSource, setPingSource] = useState<string>('');
-  const [pingDest, setPingDest] = useState<string>('');
-  const [portScanSource, setPortScanSource] = useState<string>('');
-  const [portScanDest, setPortScanDest] = useState<string>('');
-  const [portScanPorts, setPortScanPorts] = useState<string>('21, 22, 23, 80, 443, 3306, 8080');
+  // Search & Filter State
   const [eventSearch, setEventSearch] = useState<string>('');
   const [eventTypeFilter, setEventTypeFilter] = useState<string>('all');
 
@@ -88,22 +128,7 @@ export function SimulationPanel() {
     'Enforce default-deny firewall ACL & WAF query parameterization'
   );
 
-  // Endpoint nodes eligible for ping and scan
-  const pingableNodes = nodes.filter((n) => {
-    const rType = (n.data as ResourceNodeData)?.resourceType;
-    return [
-      'pc',
-      'server',
-      'linux_server',
-      'web_server',
-      'dns_server',
-      'endpoint',
-      'firewall',
-      'router',
-      'external_network',
-    ].includes(rType);
-  });
-
+  // Targetable nodes in the lab
   const attackableNodes = nodes.filter((n) => {
     const rType = (n.data as ResourceNodeData)?.resourceType;
     return [
@@ -118,10 +143,56 @@ export function SimulationPanel() {
     ].includes(rType);
   });
 
+  // Auto-select first target node if none selected
+  useEffect(() => {
+    if (!attackTarget && attackableNodes.length > 0) {
+      // Prioritize web_server or server
+      const preferred =
+        attackableNodes.find((n) =>
+          ['web_server', 'linux_server', 'server'].includes(
+            (n.data as ResourceNodeData)?.resourceType
+          )
+        ) || attackableNodes[0];
+      setAttackTarget(preferred.id);
+    }
+  }, [attackableNodes, attackTarget]);
+
+  const activeTargetNode = nodes.find((n) => n.id === attackTarget);
+  const activeTargetData = activeTargetNode?.data as ResourceNodeData | undefined;
+
+  const getNodeIcon = (type?: string) => {
+    switch (type) {
+      case 'web_server':
+        return Globe;
+      case 'linux_server':
+      case 'server':
+      case 'dns_server':
+        return Server;
+      case 'firewall':
+        return Shield;
+      case 'router':
+        return Radio;
+      case 'pc':
+      case 'endpoint':
+      default:
+        return Laptop;
+    }
+  };
+
+  const getTargetServices = (nodeData?: ResourceNodeData): string[] => {
+    const rType = nodeData?.resourceType;
+    if (rType === 'web_server') return ['HTTP:80', 'HTTPS:443'];
+    if (rType === 'linux_server' || rType === 'server') return ['SSH:22', 'HTTP:80'];
+    if (rType === 'dns_server') return ['DNS:53'];
+    if (rType === 'firewall') return ['Firewall:ACL'];
+    if (rType === 'router') return ['Router:OSPF'];
+    return ['DHCP:Client'];
+  };
+
   const handleExecuteAttack = async () => {
     if (!lab) return;
     if (!attackTarget) {
-      toastError('Please select a target host for the attack scenario');
+      toastError('Please select a target host for the attack simulation');
       return;
     }
     let parameters: Record<string, any> = {};
@@ -217,84 +288,15 @@ export function SimulationPanel() {
     }
   };
 
-  const handleValidate = async () => {
-    if (!lab) return;
-    try {
-      const res = await validateTopology(lab.id);
-      if (res.valid) {
-        toastSuccess('Topology is valid! No configuration errors detected.');
-      } else {
-        toastError(`Topology validation found ${res.errors.length} error(s).`);
-      }
-    } catch {
-      toastError('Failed to validate topology');
-    }
-  };
+  const allDisplayEvents =
+    attackResponse?.events && attackResponse.events.length > 0
+      ? attackResponse.events
+      : runEvents.length > 0
+      ? runEvents
+      : portScanEvents.length > 0
+      ? portScanEvents
+      : pingEvents;
 
-  const handleStartSim = async () => {
-    if (!lab) return;
-    try {
-      const run = await startSimulation(lab.id);
-      toastSuccess(`Simulation completed: ${run.events?.length || 0} network events generated.`);
-    } catch {
-      toastError('Simulation run failed');
-    }
-  };
-
-  const handleExecutePing = async () => {
-    if (!lab) return;
-    if (!pingSource || !pingDest) {
-      toastError('Select both a source and destination node for ping test');
-      return;
-    }
-    if (pingSource === pingDest) {
-      toastError('Source and destination cannot be the same device');
-      return;
-    }
-    try {
-      const events = await runPing(lab.id, pingSource, pingDest);
-      const replies = events.filter((e) => e.event_type === 'icmp_reply');
-      const unreachables = events.filter((e) => e.event_type === 'icmp_unreachable' || e.event_type === 'firewall_deny');
-      if (replies.length > 0) {
-        toastSuccess(`Ping successful: Host replied with ICMP echo-reply (${replies.length} reply received).`);
-      } else if (unreachables.length > 0) {
-        toastError(`Ping failed: Destination unreachable (${unreachables[0]?.summary || 'traffic blocked'}).`);
-      } else {
-        toastSuccess('Ping simulation complete.');
-      }
-    } catch (err) {
-      toastError(`Ping failed: ${(err as Error).message}`);
-    }
-  };
-
-  const handleExecutePortScan = async () => {
-    if (!lab) return;
-    if (!portScanSource || !portScanDest) {
-      toastError('Select both a scanner host and target device for port scan');
-      return;
-    }
-    if (portScanSource === portScanDest) {
-      toastError('Source and destination cannot be the same device');
-      return;
-    }
-    try {
-      const parsedPorts = portScanPorts
-        .split(',')
-        .map((p) => parseInt(p.trim(), 10))
-        .filter((p) => !isNaN(p) && p > 0 && p <= 65535);
-      const events = await runPortScan(lab.id, portScanSource, portScanDest, parsedPorts.length > 0 ? parsedPorts : undefined);
-      const summaryEvt = events.find((e) => e.event_type === 'port_scan_complete');
-      if (summaryEvt) {
-        toastSuccess(summaryEvt.summary);
-      } else {
-        toastSuccess('Port scan attack simulation complete.');
-      }
-    } catch (err) {
-      toastError(`Port scan failed: ${(err as Error).message}`);
-    }
-  };
-
-  const allDisplayEvents = runEvents.length > 0 ? runEvents : portScanEvents.length > 0 ? portScanEvents : pingEvents;
   const filteredEvents = allDisplayEvents.filter((e) => {
     if (eventTypeFilter !== 'all' && e.event_type !== eventTypeFilter) return false;
     if (eventSearch) {
@@ -340,10 +342,10 @@ export function SimulationPanel() {
 
   return (
     <div className="bg-[#11151D] border-t border-[#293140] flex flex-col transition-all duration-200 select-none z-10">
-      {/* Top Header / Mode & Tabs Bar */}
+      {/* Top Header / Mode & Streamlined 4 Tabs Bar */}
       <div className="px-3 py-2 flex items-center justify-between border-b border-[#293140] bg-[#171C26]">
         {/* Left: Tab Selectors & Panel Toggle */}
-        <div className="flex items-center gap-1 sm:gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <button
             type="button"
             onClick={() => setPanelOpen(!panelOpen)}
@@ -355,18 +357,18 @@ export function SimulationPanel() {
 
           {/* Mode Pill Indicator */}
           {appMode === 'attack' ? (
-            <div className="hidden md:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-950/70 border border-[#FF3B4E]/40 text-[#FF3B4E] text-[11px] font-bold mr-2 shadow-sm">
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-950/70 border border-[#FF3B4E]/40 text-[#FF3B4E] text-[11px] font-bold mr-1 shadow-sm">
               <Flame size={12} className="animate-pulse" />
               <span>OFFENSIVE MODE</span>
             </div>
           ) : (
-            <div className="hidden md:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-950/70 border border-[#3B82F6]/40 text-[#60A5FA] text-[11px] font-bold mr-2 shadow-sm">
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-950/70 border border-[#3B82F6]/40 text-[#60A5FA] text-[11px] font-bold mr-1 shadow-sm">
               <ShieldCheck size={12} />
               <span>DEFENSIVE MODE</span>
             </div>
           )}
 
-          {/* Tab 0: Attack Launcher */}
+          {/* Tab 1: Attack Launcher (Visual Beginner Studio) */}
           <button
             type="button"
             onClick={() => setBottomTab('attack')}
@@ -391,7 +393,24 @@ export function SimulationPanel() {
             )}
           </button>
 
-          {/* Tab 1: Verify Defense */}
+          {/* Tab 2: Linux Terminal (Interactive Kali & Target Consoles) */}
+          <button
+            type="button"
+            onClick={() => setBottomTab('terminal')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-all ${
+              bottomTab === 'terminal' && panelOpen
+                ? 'bg-emerald-950/40 text-[#34D399] border border-emerald-600/50 shadow-md shadow-emerald-950/30'
+                : 'text-[#9BA5B5] hover:text-[#F3F5F8] hover:bg-[#11151D]'
+            }`}
+          >
+            <Terminal size={14} className={bottomTab === 'terminal' && panelOpen ? 'text-[#34D399]' : 'text-emerald-400'} />
+            <span>Linux Terminal</span>
+            <span className="hidden md:inline px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 text-[9px] font-mono">
+              CLI
+            </span>
+          </button>
+
+          {/* Tab 3: Verify Defense */}
           <button
             type="button"
             onClick={() => setBottomTab('defense_verify')}
@@ -416,26 +435,7 @@ export function SimulationPanel() {
             )}
           </button>
 
-          {/* Tab 2: Network Simulation */}
-          <button
-            type="button"
-            onClick={() => setBottomTab('simulation')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-              bottomTab === 'simulation' && panelOpen
-                ? 'bg-[#3B82F6]/15 text-[#60A5FA] border border-[#3B82F6]/30 font-semibold'
-                : 'text-[#9BA5B5] hover:text-[#F3F5F8] hover:bg-[#11151D]'
-            }`}
-          >
-            <Activity size={14} className={bottomTab === 'simulation' && panelOpen ? 'text-[#60A5FA]' : ''} />
-            <span>Network Simulation</span>
-            {validationResult && !validationResult.valid && (
-              <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-black text-[10px] font-bold">
-                {validationResult.errors.length}
-              </span>
-            )}
-          </button>
-
-          {/* Tab 3: Traffic / Events */}
+          {/* Tab 4: Traffic Inspector */}
           <button
             type="button"
             onClick={() => setBottomTab('traffic')}
@@ -452,34 +452,6 @@ export function SimulationPanel() {
                 {allDisplayEvents.length}
               </span>
             )}
-          </button>
-
-          {/* Tab 4: Ping Diagnostic */}
-          <button
-            type="button"
-            onClick={() => setBottomTab('ping')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-              bottomTab === 'ping' && panelOpen
-                ? 'bg-[#10B981]/15 text-[#34D399] border border-[#10B981]/30 font-semibold'
-                : 'text-[#9BA5B5] hover:text-[#F3F5F8] hover:bg-[#11151D]'
-            }`}
-          >
-            <Send size={13} className={bottomTab === 'ping' && panelOpen ? 'text-[#34D399]' : ''} />
-            <span>Ping Tool</span>
-          </button>
-
-          {/* Tab 5: Port Scanner (Attack Simulation) */}
-          <button
-            type="button"
-            onClick={() => setBottomTab('portscan')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-              bottomTab === 'portscan' && panelOpen
-                ? 'bg-[#EC4899]/15 text-[#F472B6] border border-[#EC4899]/30 font-semibold'
-                : 'text-[#9BA5B5] hover:text-[#F3F5F8] hover:bg-[#11151D]'
-            }`}
-          >
-            <Crosshair size={13} className={bottomTab === 'portscan' && panelOpen ? 'text-[#F472B6]' : ''} />
-            <span>Port Scanner</span>
           </button>
         </div>
 
@@ -510,31 +482,6 @@ export function SimulationPanel() {
             </Button>
           )}
 
-
-
-          {bottomTab === 'simulation' && (
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={handleValidate}
-                loading={validating}
-                icon={<CheckCircle2 size={13} />}
-              >
-                Validate
-              </Button>
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={handleStartSim}
-                loading={runLoading}
-                icon={<Play size={13} />}
-              >
-                {runLoading ? 'Simulating...' : 'Run Simulation'}
-              </Button>
-            </div>
-          )}
-
           {bottomTab === 'traffic' && (
             <div className="flex items-center gap-2">
               <div className="relative w-40 sm:w-56">
@@ -554,150 +501,262 @@ export function SimulationPanel() {
 
       {/* Main Panel Content (collapsible) */}
       {panelOpen && (
-        <div className="h-72 flex flex-col bg-[#11151D] overflow-hidden">
-          {/* ----------------- TAB 0: ATTACK SCENARIO LAUNCHER ----------------- */}
+        <div className="h-80 md:h-[350px] flex flex-col bg-[#11151D] overflow-hidden">
+          {/* ----------------- TAB 1: VISUAL ATTACK LAUNCHER ----------------- */}
           {bottomTab === 'attack' && (
-            <div className="flex-1 flex overflow-hidden">
-              {/* Left Column: Attack Scenario Configuration */}
-              <div className="w-80 border-r border-[#293140] p-3 flex flex-col gap-2.5 overflow-y-auto bg-[#11151D]">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#FF3B4E] flex items-center gap-1.5">
-                    <Flame size={14} className="text-[#FF3B4E]" />
-                    Attack Scenario Launcher
-                  </h4>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-950/60 text-[#FF3B4E] border border-red-800/50 font-bold font-mono">
-                    ATTACK MODE
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {/* Step 1: Target Victim Selection Ribbon */}
+              <div className="bg-[#171C26]/80 border-b border-[#293140] px-3 py-2 flex items-center justify-between gap-3 overflow-x-auto">
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="w-5 h-5 rounded-full bg-red-950/70 border border-[#FF3B4E]/60 flex items-center justify-center text-[#FF3B4E] font-bold text-[10px]">
+                    1
+                  </div>
+                  <span className="text-xs font-bold text-[#F3F5F8] uppercase tracking-wider flex items-center gap-1.5">
+                    <Crosshair size={13} className="text-[#FF3B4E]" />
+                    Victim Target:
                   </span>
                 </div>
 
-                <div>
-                  <label className="text-[11px] font-semibold text-[#9BA5B5] block mb-1">Select Attack Scenario</label>
-                  <select
-                    value={selectedScenario}
-                    onChange={(e) => setSelectedScenario(e.target.value)}
-                    className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1.5 text-xs text-[#F3F5F8] focus:border-[#FF3B4E] focus:outline-none"
-                  >
-                    <option value="attack_port_scan">Network Recon: TCP Port Scan & Fingerprinting</option>
-                    <option value="auth_brute_force">Authentication: SSH Dictionary Brute Force</option>
-                    <option value="traffic_analysis">Traffic Sniffing: Cleartext Tokens & PCAP Capture</option>
-                    <option value="web_security_injection">Web Security: OWASP SQLi / XSS Attack</option>
-                    <option value="firewall_segmentation">Segmentation: Cross-VLAN Lateral Movement</option>
-                    <option value="syn_flood_dos">Denial of Service: TCP SYN Flood Attack</option>
-                    <option value="arp_cache_poisoning">L2 Poisoning: ARP Cache Spoofing & Redirection</option>
-                  </select>
+                {/* Device Cards Strip */}
+                <div className="flex items-center gap-2 overflow-x-auto py-0.5">
+                  {attackableNodes.length === 0 ? (
+                    <span className="text-xs text-[#9BA5B5] italic">
+                      No network devices found on canvas. Drag a server or PC from the library.
+                    </span>
+                  ) : (
+                    attackableNodes.map((n) => {
+                      const data = n.data as ResourceNodeData;
+                      const Icon = getNodeIcon(data?.resourceType);
+                      const isSelected = attackTarget === n.id;
+                      const services = getTargetServices(data);
+
+                      return (
+                        <button
+                          key={n.id}
+                          type="button"
+                          onClick={() => setAttackTarget(n.id)}
+                          className={`flex items-center gap-2 px-2.5 py-1 rounded-lg border text-left transition-all flex-shrink-0 ${
+                            isSelected
+                              ? 'bg-red-950/50 border-[#FF3B4E] shadow-sm shadow-[#FF3B4E]/30 ring-1 ring-[#FF3B4E]'
+                              : 'bg-[#11151D] border-[#293140] hover:border-[#FF3B4E]/40 hover:bg-[#171C26]'
+                          }`}
+                        >
+                          <div
+                            className={`p-1 rounded ${
+                              isSelected ? 'bg-[#FF3B4E]/20 text-[#FF3B4E]' : 'bg-[#171C26] text-[#9BA5B5]'
+                            }`}
+                          >
+                            <Icon size={14} />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`text-xs font-bold ${
+                                  isSelected ? 'text-[#FF3B4E]' : 'text-[#F3F5F8]'
+                                }`}
+                              >
+                                {String(data?.config?.name || n.id)}
+                              </span>
+                              {isSelected && (
+                                <span className="px-1 py-0.2 rounded bg-[#FF3B4E] text-white text-[9px] font-extrabold uppercase">
+                                  LOCKED
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[10px] text-[#9BA5B5] font-mono">
+                              <span>{String(data?.config?.ip_address || '10.0.0.x')}</span>
+                              <span>•</span>
+                              <span className="text-emerald-400">{services[0]}</span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
-
-                <div>
-                  <label className="text-[11px] font-semibold text-[#9BA5B5] block mb-1">Target Victim Device</label>
-                  <select
-                    value={attackTarget}
-                    onChange={(e) => setAttackTarget(e.target.value)}
-                    className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1.5 text-xs text-[#F3F5F8] focus:border-[#FF3B4E] focus:outline-none"
-                  >
-                    <option value="">-- Choose Target in Lab --</option>
-                    {attackableNodes.map((n) => (
-                      <option key={n.id} value={n.id}>
-                        {((n.data as ResourceNodeData).config?.name as string) || n.id} ({((n.data as ResourceNodeData).resourceType).replace('_', ' ')})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Scenario specific parameters */}
-                {selectedScenario === 'attack_port_scan' && (
-                  <div>
-                    <label className="text-[11px] font-medium text-[#9BA5B5] block mb-1">Probed TCP Ports</label>
-                    <input
-                      type="text"
-                      value={attackPorts}
-                      onChange={(e) => setAttackPorts(e.target.value)}
-                      className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1 text-xs text-[#F3F5F8] font-mono focus:border-[#FF3B4E] focus:outline-none"
-                    />
-                  </div>
-                )}
-
-                {selectedScenario === 'syn_flood_dos' && (
-                  <div>
-                    <label className="text-[11px] font-medium text-[#9BA5B5] block mb-1">Target Service Port</label>
-                    <input
-                      type="text"
-                      value={attackPorts}
-                      onChange={(e) => setAttackPorts(e.target.value)}
-                      placeholder="80"
-                      className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1 text-xs text-[#F3F5F8] font-mono focus:border-[#FF3B4E] focus:outline-none"
-                    />
-                  </div>
-                )}
-
-                {selectedScenario === 'auth_brute_force' && (
-                  <div className="space-y-1.5">
-                    <div>
-                      <label className="text-[11px] font-medium text-[#9BA5B5] block mb-0.5">Target Username</label>
-                      <input
-                        type="text"
-                        value={attackUsername}
-                        onChange={(e) => setAttackUsername(e.target.value)}
-                        className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1 text-xs text-[#F3F5F8] font-mono focus:border-[#FF3B4E] focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-medium text-[#9BA5B5] block mb-0.5">Password Wordlist</label>
-                      <input
-                        type="text"
-                        value={attackWordlist}
-                        onChange={(e) => setAttackWordlist(e.target.value)}
-                        className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1 text-xs text-[#F3F5F8] font-mono focus:border-[#FF3B4E] focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {selectedScenario === 'web_security_injection' && (
-                  <div>
-                    <label className="text-[11px] font-medium text-[#9BA5B5] block mb-1">SQLi / XSS Injection Vector</label>
-                    <input
-                      type="text"
-                      value={attackPayload}
-                      onChange={(e) => setAttackPayload(e.target.value)}
-                      className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1 text-xs text-[#F3F5F8] font-mono focus:border-[#FF3B4E] focus:outline-none"
-                    />
-                  </div>
-                )}
-
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={handleExecuteAttack}
-                  loading={attackLoading}
-                  disabled={!attackTarget}
-                  icon={<Flame size={13} />}
-                  className="mt-1 shadow-md shadow-red-900/30"
-                >
-                  {attackLoading ? 'Simulating Attack...' : 'Launch Attack Run'}
-                </Button>
               </div>
 
-              {/* Right Column: Execution Console & Evidence */}
-              <div className="flex-1 p-3 overflow-y-auto flex flex-col gap-3">
-                {!attackResponse ? (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-xs text-[#9BA5B5] gap-2">
-                    <Flame size={36} className="text-[#FF3B4E]/40" />
-                    <p className="text-sm font-semibold text-[#F3F5F8]">Ready for Attack Simulation</p>
-                    <p className="max-w-md">
-                      Select an authorized target device from your lab and trigger an offensive simulation to test security posture.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {/* Status Header */}
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-[#171C26] border border-[#293140]">
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-[#9BA5B5] block">Scenario Execution Result</span>
-                        <h3 className="text-sm font-bold text-[#F3F5F8]">{attackResponse.scenario_title}</h3>
+              {/* Step 2 & 3: Attack Vectors and Execution Results */}
+              <div className="flex-1 flex overflow-hidden">
+                {/* Left: Visual Attack Vector Grid */}
+                <div className="w-1/2 md:w-3/5 border-r border-[#293140] p-3 flex flex-col gap-2.5 overflow-y-auto bg-[#11151D]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-full bg-red-950/70 border border-[#FF3B4E]/60 flex items-center justify-center text-[#FF3B4E] font-bold text-[10px]">
+                        2
                       </div>
-                      <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-[#F3F5F8]">
+                        Choose Attack Vector
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-[#9BA5B5]">
+                      Click card to select attack method
+                    </span>
+                  </div>
+
+                  {/* 6 Visual Attack Scenario Cards Grid */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {ATTACK_SCENARIOS.map((sc) => {
+                      const Icon = sc.icon;
+                      const isSelected = selectedScenario === sc.id;
+
+                      return (
+                        <div
+                          key={sc.id}
+                          onClick={() => setSelectedScenario(sc.id)}
+                          className={`p-2.5 rounded-lg border cursor-pointer transition-all flex flex-col justify-between ${
+                            isSelected
+                              ? 'bg-red-950/30 border-[#FF3B4E] shadow-md shadow-[#FF3B4E]/20 ring-1 ring-[#FF3B4E]'
+                              : 'bg-[#171C26] border-[#293140] hover:border-[#FF3B4E]/40 hover:bg-[#1a202c]'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-1.5">
+                                <Icon
+                                  size={14}
+                                  className={isSelected ? 'text-[#FF3B4E]' : 'text-[#9BA5B5]'}
+                                />
+                                <span
+                                  className={`text-xs font-bold ${
+                                    isSelected ? 'text-[#FF3B4E]' : 'text-[#F3F5F8]'
+                                  }`}
+                                >
+                                  {sc.title}
+                                </span>
+                              </div>
+                              <span
+                                className={`text-[9px] px-1.5 py-0.2 rounded border font-semibold ${sc.badgeColor}`}
+                              >
+                                {sc.category}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-[#9BA5B5] leading-relaxed line-clamp-2">
+                              {sc.description}
+                            </p>
+                          </div>
+
+                          <div className="mt-2 pt-1 border-t border-[#293140]/60 flex items-center justify-between text-[9px]">
+                            <span className="text-[#60A5FA] font-mono">
+                              Target: {String(activeTargetData?.config?.name || 'Device')}
+                            </span>
+                            <span
+                              className={`font-bold ${
+                                isSelected ? 'text-[#FF3B4E]' : 'text-[#9BA5B5]'
+                              }`}
+                            >
+                              {isSelected ? '✓ Selected' : 'Select →'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Compact Parameters & Big Attack Launch Button */}
+                  <div className="mt-1 p-2.5 rounded-lg bg-[#171C26] border border-[#293140] flex items-center justify-between gap-3">
+                    <div className="flex-1 text-xs">
+                      {selectedScenario === 'attack_port_scan' && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-[#9BA5B5] flex-shrink-0">Scan Ports:</span>
+                          <input
+                            type="text"
+                            value={attackPorts}
+                            onChange={(e) => setAttackPorts(e.target.value)}
+                            className="w-full bg-[#11151D] border border-[#293140] rounded px-2 py-1 text-xs text-[#F3F5F8] font-mono focus:border-[#FF3B4E] focus:outline-none"
+                            placeholder="21, 22, 23, 80, 443"
+                          />
+                        </div>
+                      )}
+                      {selectedScenario === 'syn_flood_dos' && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-[#9BA5B5] flex-shrink-0">Target Port:</span>
+                          <input
+                            type="text"
+                            value={attackPorts}
+                            onChange={(e) => setAttackPorts(e.target.value)}
+                            className="w-full bg-[#11151D] border border-[#293140] rounded px-2 py-1 text-xs text-[#F3F5F8] font-mono focus:border-[#FF3B4E] focus:outline-none"
+                            placeholder="80"
+                          />
+                        </div>
+                      )}
+                      {selectedScenario === 'auth_brute_force' && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-[#9BA5B5] flex-shrink-0">User:</span>
+                          <input
+                            type="text"
+                            value={attackUsername}
+                            onChange={(e) => setAttackUsername(e.target.value)}
+                            className="w-20 bg-[#11151D] border border-[#293140] rounded px-2 py-1 text-xs text-[#F3F5F8] font-mono focus:border-[#FF3B4E] focus:outline-none"
+                          />
+                          <span className="text-[11px] text-[#9BA5B5] flex-shrink-0">Wordlist:</span>
+                          <input
+                            type="text"
+                            value={attackWordlist}
+                            onChange={(e) => setAttackWordlist(e.target.value)}
+                            className="w-full bg-[#11151D] border border-[#293140] rounded px-2 py-1 text-xs text-[#F3F5F8] font-mono focus:border-[#FF3B4E] focus:outline-none"
+                          />
+                        </div>
+                      )}
+                      {selectedScenario === 'web_security_injection' && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-[#9BA5B5] flex-shrink-0">Payload:</span>
+                          <input
+                            type="text"
+                            value={attackPayload}
+                            onChange={(e) => setAttackPayload(e.target.value)}
+                            className="w-full bg-[#11151D] border border-[#293140] rounded px-2 py-1 text-xs text-[#F3F5F8] font-mono focus:border-[#FF3B4E] focus:outline-none"
+                          />
+                        </div>
+                      )}
+                      {(selectedScenario === 'arp_cache_poisoning' ||
+                        selectedScenario === 'traffic_analysis') && (
+                        <span className="text-[11px] text-[#9BA5B5]">
+                          Ready to simulate Layer 2 attack against {String(activeTargetData?.config?.name || 'target')}.
+                        </span>
+                      )}
+                    </div>
+
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={handleExecuteAttack}
+                      loading={attackLoading}
+                      disabled={!attackTarget}
+                      icon={<Flame size={14} />}
+                      className="px-4 py-2 font-bold shadow-lg shadow-red-950/40"
+                    >
+                      {attackLoading ? 'Simulating...' : 'Launch Attack'}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Right: Attack Execution Results & Lootbox */}
+                <div className="w-1/2 md:w-2/5 p-3 overflow-y-auto flex flex-col gap-2.5 bg-[#0B0D12]">
+                  {!attackResponse ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-xs text-[#9BA5B5] gap-2 border border-dashed border-[#293140] rounded-lg">
+                      <Flame size={32} className="text-[#FF3B4E]/30" />
+                      <p className="text-sm font-bold text-[#F3F5F8]">Attack Console Ready</p>
+                      <p className="max-w-xs text-[11px]">
+                        1. Select target device above<br />
+                        2. Pick an attack vector card<br />
+                        3. Click "Launch Attack" to simulate exploit!
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {/* Status Banner */}
+                      <div className="flex items-center justify-between p-2.5 rounded-lg bg-[#171C26] border border-[#293140]">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-[#9BA5B5] block">
+                            Scenario Result
+                          </span>
+                          <h4 className="text-xs font-bold text-[#F3F5F8]">
+                            {attackResponse.scenario_title}
+                          </h4>
+                        </div>
                         <span
-                          className={`px-3 py-1 rounded-md text-xs font-extrabold uppercase tracking-wider border ${
+                          className={`px-2.5 py-1 rounded text-xs font-extrabold uppercase tracking-wider border ${
                             attackResponse.outcome === 'compromised'
                               ? 'bg-red-950/80 text-[#FF3B4E] border-[#FF3B4E]/60 shadow-lg shadow-red-900/40'
                               : attackResponse.outcome === 'blocked'
@@ -708,19 +767,19 @@ export function SimulationPanel() {
                           {attackResponse.outcome}
                         </span>
                       </div>
-                    </div>
 
-                    {/* Evidence and Telemetry */}
-                    <div className="grid grid-cols-2 gap-3 text-xs">
-                      {/* Left: Evidence Loot */}
-                      <div className="p-3 rounded-lg bg-[#171C26] border border-[#293140] space-y-2">
-                        <span className="text-[11px] font-semibold text-[#FF8A4C] uppercase tracking-wider block flex items-center gap-1.5">
+                      {/* Captured Evidence & Loot Box */}
+                      <div className="p-2.5 rounded-lg bg-[#171C26] border border-[#293140] space-y-1.5">
+                        <span className="text-[10px] font-bold text-[#FF8A4C] uppercase tracking-wider block flex items-center gap-1.5">
                           <Lock size={12} />
-                          Captured Evidence & Artifacts
+                          Captured Evidence & Exploit Loot
                         </span>
-                        <div className="bg-[#0B0D12] p-2 rounded border border-[#293140] font-mono text-[11px] space-y-1 text-[#F3F5F8]">
+                        <div className="bg-[#0B0D12] p-2 rounded border border-[#293140] font-mono text-[10px] space-y-1 text-[#F3F5F8]">
                           {Object.entries(attackResponse.evidence).map(([key, val]) => (
-                            <div key={key} className="flex justify-between border-b border-[#171C26] pb-0.5">
+                            <div
+                              key={key}
+                              className="flex justify-between border-b border-[#171C26] pb-0.5"
+                            >
                               <span className="text-[#9BA5B5]">{key}:</span>
                               <span className="text-[#FF3B4E] font-semibold">{String(val)}</span>
                             </div>
@@ -728,60 +787,41 @@ export function SimulationPanel() {
                         </div>
                       </div>
 
-                      {/* Right: Educational Exploit Analysis & Next Step */}
-                      <div className="p-3 rounded-lg bg-[#171C26] border border-[#293140] space-y-2 flex flex-col justify-between">
-                        <div>
-                          <span className="text-[11px] font-semibold text-[#60A5FA] uppercase tracking-wider block flex items-center gap-1.5">
-                            <Terminal size={12} />
-                            Educational Assessment & Remediation
-                          </span>
-                          <p className="text-[11px] text-[#9BA5B5] mt-1 leading-relaxed">
-                            {attackResponse.educational_takeaway}
-                          </p>
-                        </div>
+                      {/* Educational Takeaway & Remediation Button */}
+                      <div className="p-2.5 rounded-lg bg-[#171C26] border border-[#293140] space-y-2">
+                        <p className="text-[10px] text-[#9BA5B5] leading-relaxed">
+                          {attackResponse.educational_takeaway}
+                        </p>
 
                         {attackResponse.outcome === 'compromised' && (
-                          <div className="pt-2 border-t border-[#293140]">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setAppMode('defend');
-                                setBottomTab('defense_verify');
-                              }}
-                              className="w-full py-1.5 px-2 bg-[#3B82F6]/20 hover:bg-[#3B82F6]/30 text-[#60A5FA] border border-[#3B82F6]/40 rounded text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
-                            >
-                              <ShieldCheck size={13} />
-                              <span>Switch to DEFEND MODE to Remediate →</span>
-                            </button>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAppMode('defend');
+                              setBottomTab('defense_verify');
+                            }}
+                            className="w-full py-1.5 px-2 bg-[#3B82F6]/20 hover:bg-[#3B82F6]/30 text-[#60A5FA] border border-[#3B82F6]/40 rounded text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                          >
+                            <ShieldCheck size={13} />
+                            <span>Switch to DEFEND MODE to Fix →</span>
+                          </button>
                         )}
                       </div>
                     </div>
-
-                    {/* Packet Events Table */}
-                    {attackResponse.events && attackResponse.events.length > 0 && (
-                      <div className="border border-[#293140] rounded overflow-hidden">
-                        <div className="px-3 py-1.5 bg-[#171C26] text-[10px] font-semibold text-[#9BA5B5] uppercase">
-                          Observed Packet Telemetry ({attackResponse.events.length} events)
-                        </div>
-                        <div className="max-h-28 overflow-y-auto text-xs font-mono">
-                          {attackResponse.events.map((evt, i) => (
-                            <div key={i} className="px-3 py-1 border-b border-[#293140]/60 flex items-center justify-between hover:bg-[#171C26]/40">
-                              <span className="text-[#9BA5B5]">{evt.event_type}</span>
-                              <span className="text-[#F3F5F8] max-w-sm truncate">{evt.summary}</span>
-                              <span className="text-emerald-400 text-[10px]">{evt.provenance}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           )}
 
-          {/* ----------------- TAB 0.5: DEFENSE VERIFICATION (BEFORE/AFTER) ----------------- */}
+          {/* ----------------- TAB 2: INTERACTIVE LINUX TERMINAL ----------------- */}
+          {bottomTab === 'terminal' && (
+            <div className="flex-1 flex overflow-hidden">
+              <LinuxTerminal />
+            </div>
+          )}
+
+          {/* ----------------- TAB 3: DEFENSE VERIFICATION (BEFORE/AFTER) ----------------- */}
           {bottomTab === 'defense_verify' && (
             <div className="flex-1 flex overflow-hidden">
               {/* Left Column: Verification Controls */}
@@ -797,7 +837,9 @@ export function SimulationPanel() {
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-semibold text-[#9BA5B5] block mb-1">Select Scenario to Verify</label>
+                  <label className="text-[11px] font-semibold text-[#9BA5B5] block mb-1">
+                    Select Scenario to Verify
+                  </label>
                   <select
                     value={selectedScenario}
                     onChange={(e) => setSelectedScenario(e.target.value)}
@@ -812,7 +854,9 @@ export function SimulationPanel() {
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-semibold text-[#9BA5B5] block mb-1">Target Host Under Defense</label>
+                  <label className="text-[11px] font-semibold text-[#9BA5B5] block mb-1">
+                    Target Host Under Defense
+                  </label>
                   <select
                     value={attackTarget}
                     onChange={(e) => setAttackTarget(e.target.value)}
@@ -821,14 +865,17 @@ export function SimulationPanel() {
                     <option value="">-- Select Protected Host --</option>
                     {attackableNodes.map((n) => (
                       <option key={n.id} value={n.id}>
-                        {((n.data as ResourceNodeData).config?.name as string) || n.id} ({((n.data as ResourceNodeData).resourceType).replace('_', ' ')})
+                        {((n.data as ResourceNodeData).config?.name as string) || n.id} (
+                        {((n.data as ResourceNodeData).resourceType).replace('_', ' ')})
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-medium text-[#9BA5B5] block mb-1">Applied Defense Summary</label>
+                  <label className="text-[11px] font-medium text-[#9BA5B5] block mb-1">
+                    Applied Defense Summary
+                  </label>
                   <input
                     type="text"
                     value={defenseActionSummary}
@@ -862,7 +909,9 @@ export function SimulationPanel() {
                 {!comparisonResult ? (
                   <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-xs text-[#9BA5B5] gap-2">
                     <ShieldCheck size={36} className="text-[#3B82F6]/40" />
-                    <p className="text-sm font-semibold text-[#F3F5F8]">Verify Defense Effectiveness</p>
+                    <p className="text-sm font-semibold text-[#F3F5F8]">
+                      Verify Defense Effectiveness
+                    </p>
                     <p className="max-w-md">
                       Click "Run Verification Test" to compare your current hardened configuration against the baseline attack outcome.
                     </p>
@@ -974,132 +1023,7 @@ export function SimulationPanel() {
             </div>
           )}
 
-
-
-          {/* ----------------- TAB 2: NETWORK SIMULATION ----------------- */}
-          {bottomTab === 'simulation' && (
-            <div className="flex-1 flex overflow-hidden">
-              {/* Left pane: Topology validation report */}
-              <div className="w-1/2 border-r border-[#293140] flex flex-col p-4 overflow-y-auto">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-[#9BA5B5] flex items-center gap-1.5">
-                    <CheckCircle2 size={14} className="text-[#60A5FA]" />
-                    Topology Validation
-                  </h4>
-                  {validationResult && (
-                    <span
-                      className={`px-2 py-0.5 rounded text-[11px] font-bold border ${
-                        validationResult.valid
-                          ? 'bg-emerald-950 text-emerald-400 border-emerald-800'
-                          : 'bg-red-950 text-red-400 border-red-800'
-                      }`}
-                    >
-                      {validationResult.valid ? 'VALID' : 'INVALID'}
-                    </span>
-                  )}
-                </div>
-
-                {!validationResult ? (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center text-xs text-[#9BA5B5] gap-2">
-                    <p>No topology validation performed yet.</p>
-                    <Button size="sm" variant="secondary" onClick={handleValidate} loading={validating}>
-                      Validate Topology
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-2 text-xs">
-                    {validationResult.errors.length === 0 && validationResult.warnings.length === 0 && (
-                      <div className="p-3 bg-emerald-950/30 border border-emerald-800/40 rounded text-emerald-400">
-                        ✓ All devices have valid IP configuration, gateways, and link integrity.
-                      </div>
-                    )}
-
-                    {validationResult.errors.map((err, idx) => (
-                      <div key={idx} className="p-2.5 bg-red-950/40 border border-red-800/50 rounded flex items-start gap-2">
-                        <XCircle size={14} className="text-red-400 mt-0.5 flex-shrink-0" />
-                        <div>
-                          <div className="font-semibold text-red-300 font-mono text-[11px]">{err.code}</div>
-                          <div className="text-red-200 mt-0.5">{err.message}</div>
-                        </div>
-                      </div>
-                    ))}
-
-                    {validationResult.warnings.map((warn, idx) => (
-                      <div key={idx} className="p-2.5 bg-amber-950/30 border border-amber-800/40 rounded flex items-start gap-2">
-                        <AlertCircle size={14} className="text-amber-400 mt-0.5 flex-shrink-0" />
-                        <div>
-                          <div className="font-semibold text-amber-300 font-mono text-[11px]">{warn.code}</div>
-                          <div className="text-amber-200 mt-0.5">{warn.message}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Right pane: Run Summary */}
-              <div className="w-1/2 flex flex-col p-4 overflow-y-auto">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-[#9BA5B5] flex items-center gap-1.5">
-                    <Activity size={14} className="text-[#60A5FA]" />
-                    Simulation Run Status
-                  </h4>
-                  {currentRun && (
-                    <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-950 text-blue-400 border border-blue-800 font-mono">
-                      {currentRun.status.toUpperCase()}
-                    </span>
-                  )}
-                </div>
-
-                {!currentRun ? (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center text-xs text-[#9BA5B5] gap-2">
-                    <p>Click "Run Simulation" to execute automated deterministic reachability tests across all device pairs.</p>
-                    <Button size="sm" variant="primary" onClick={handleStartSim} loading={runLoading}>
-                      Run Simulation
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-3 text-xs">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="p-3 bg-[#171C26] border border-[#293140] rounded">
-                        <span className="text-[10px] text-[#9BA5B5] block uppercase">Tested Pairs</span>
-                        <span className="text-base font-bold text-[#F3F5F8]">
-                          {String(currentRun.result_summary?.pairs_tested ?? 0)}
-                        </span>
-                      </div>
-                      <div className="p-3 bg-[#171C26] border border-[#293140] rounded">
-                        <span className="text-[10px] text-[#9BA5B5] block uppercase">Reachable Pairs</span>
-                        <span className="text-base font-bold text-emerald-400">
-                          {String(currentRun.result_summary?.reachable_pairs ?? 0)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="p-3 bg-[#171C26] border border-[#293140] rounded space-y-1">
-                      <div className="flex justify-between text-[#9BA5B5] text-[11px]">
-                        <span>Mode:</span>
-                        <span className="text-[#F3F5F8] font-mono">{currentRun.mode}</span>
-                      </div>
-                      <div className="flex justify-between text-[#9BA5B5] text-[11px]">
-                        <span>Run ID:</span>
-                        <span className="text-[#F3F5F8] font-mono truncate max-w-[200px]">{currentRun.id}</span>
-                      </div>
-                      <div className="flex justify-between text-[#9BA5B5] text-[11px]">
-                        <span>Events Generated:</span>
-                        <span className="text-[#60A5FA] font-bold">{currentRun.events?.length || 0}</span>
-                      </div>
-                    </div>
-
-                    <Button size="sm" variant="secondary" onClick={() => setBottomTab('traffic')} className="w-full">
-                      View Generated Network Packets in Traffic Inspector →
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ----------------- TAB 3: TRAFFIC / PACKET INSPECTOR ----------------- */}
+          {/* ----------------- TAB 4: TRAFFIC / PACKET INSPECTOR ----------------- */}
           {bottomTab === 'traffic' && (
             <div className="flex-1 flex flex-col overflow-hidden">
               <div className="px-4 py-2 bg-[#171C26] border-b border-[#293140] flex items-center justify-between text-xs">
@@ -1128,7 +1052,7 @@ export function SimulationPanel() {
               <div className="flex-1 overflow-y-auto">
                 {filteredEvents.length === 0 ? (
                   <div className="text-center py-10 text-xs text-[#9BA5B5]">
-                    No network events recorded yet. Run a simulation or send an ICMP Ping from the Ping Tool.
+                    No network events recorded yet. Launch an attack or run terminal commands to generate packet telemetry.
                   </div>
                 ) : (
                   <table className="w-full text-left text-xs text-[#F3F5F8]">
@@ -1146,7 +1070,11 @@ export function SimulationPanel() {
                       {filteredEvents.map((evt, idx) => (
                         <tr key={evt.id || idx} className="hover:bg-[#171C26]/60 transition-colors">
                           <td className="py-2 px-3">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border font-mono ${getEventBadge(evt.event_type)}`}>
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold border font-mono ${getEventBadge(
+                                evt.event_type
+                              )}`}
+                            >
                               {evt.event_type.replace('_', ' ')}
                             </span>
                           </td>
@@ -1171,203 +1099,6 @@ export function SimulationPanel() {
                       ))}
                     </tbody>
                   </table>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ----------------- TAB 4: INTERACTIVE PING TOOL ----------------- */}
-          {bottomTab === 'ping' && (
-            <div className="flex-1 flex overflow-hidden">
-              {/* Left Ping Controls */}
-              <div className="w-80 border-r border-[#293140] p-4 flex flex-col gap-3">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-[#9BA5B5] flex items-center gap-1.5">
-                  <Send size={14} className="text-[#10B981]" />
-                  Interactive Ping Diagnostic
-                </h4>
-
-                <div>
-                  <label className="text-xs font-medium text-[#9BA5B5] block mb-1">Source Host</label>
-                  <select
-                    value={pingSource}
-                    onChange={(e) => setPingSource(e.target.value)}
-                    className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1.5 text-xs text-[#F3F5F8] focus:border-[#10B981] focus:outline-none"
-                  >
-                    <option value="">-- Select Source Node --</option>
-                    {pingableNodes.map((n) => (
-                      <option key={n.id} value={n.id}>
-                        {((n.data as ResourceNodeData).config?.name as string) || n.id} ({(n.data as ResourceNodeData).resourceType})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-[#9BA5B5] block mb-1">Destination Host</label>
-                  <select
-                    value={pingDest}
-                    onChange={(e) => setPingDest(e.target.value)}
-                    className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1.5 text-xs text-[#F3F5F8] focus:border-[#10B981] focus:outline-none"
-                  >
-                    <option value="">-- Select Destination Node --</option>
-                    {pingableNodes.map((n) => (
-                      <option key={n.id} value={n.id}>
-                        {((n.data as ResourceNodeData).config?.name as string) || n.id} ({(n.data as ResourceNodeData).resourceType})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={handleExecutePing}
-                  loading={pingLoading}
-                  disabled={!pingSource || !pingDest}
-                  icon={<Send size={13} />}
-                  className="mt-2"
-                >
-                  {pingLoading ? 'Transmitting ICMP...' : 'Send ICMP Echo (Ping)'}
-                </Button>
-
-                <p className="text-[11px] text-[#9BA5B5] mt-1">
-                  Tests Layer 3 IP reachability, subnet masks, default gateways, and evaluates intermediate firewalls.
-                </p>
-              </div>
-
-              {/* Right Ping Results Stream */}
-              <div className="flex-1 p-4 overflow-y-auto">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-[#9BA5B5] mb-3">
-                  Live ICMP Packet Sequence
-                </h4>
-
-                {pingEvents.length === 0 ? (
-                  <div className="h-44 flex flex-col items-center justify-center text-center text-xs text-[#9BA5B5]">
-                    Select a source and destination above and click "Send ICMP Echo" to view packet exchange.
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {pingEvents.map((pe, idx) => (
-                      <div
-                        key={pe.id || idx}
-                        className="p-3 bg-[#171C26] border border-[#293140] rounded flex items-center justify-between text-xs"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border font-mono ${getEventBadge(pe.event_type)}`}>
-                            {pe.event_type.toUpperCase()}
-                          </span>
-                          <span className="font-semibold text-[#F3F5F8]">{pe.source_device_name || pe.source_device_id}</span>
-                          <ArrowRight size={13} className="text-[#9BA5B5]" />
-                          <span className="font-semibold text-[#F3F5F8]">{pe.dest_device_name || pe.dest_device_id}</span>
-                        </div>
-                        <div className="text-[#9BA5B5] max-w-sm truncate text-[11px]">{pe.summary}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ----------------- TAB 5: PORT SCANNER ATTACK TOOL ----------------- */}
-          {bottomTab === 'portscan' && (
-            <div className="flex-1 flex overflow-hidden">
-              {/* Left Controls */}
-              <div className="w-80 border-r border-[#293140] p-4 flex flex-col gap-3">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-[#9BA5B5] flex items-center gap-1.5">
-                  <Crosshair size={14} className="text-[#EC4899]" />
-                  TCP Port Scanner & Attack Recon
-                </h4>
-
-                <div>
-                  <label className="text-xs font-medium text-[#9BA5B5] block mb-1">Attacker / Scanner Host</label>
-                  <select
-                    value={portScanSource}
-                    onChange={(e) => setPortScanSource(e.target.value)}
-                    className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1.5 text-xs text-[#F3F5F8] focus:border-[#EC4899] focus:outline-none"
-                  >
-                    <option value="">-- Select Scanner Node --</option>
-                    {pingableNodes.map((n) => (
-                      <option key={n.id} value={n.id}>
-                        {((n.data as ResourceNodeData).config?.name as string) || n.id} ({(n.data as ResourceNodeData).resourceType})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-[#9BA5B5] block mb-1">Target Victim Device</label>
-                  <select
-                    value={portScanDest}
-                    onChange={(e) => setPortScanDest(e.target.value)}
-                    className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1.5 text-xs text-[#F3F5F8] focus:border-[#EC4899] focus:outline-none"
-                  >
-                    <option value="">-- Select Target Node --</option>
-                    {pingableNodes.map((n) => (
-                      <option key={n.id} value={n.id}>
-                        {((n.data as ResourceNodeData).config?.name as string) || n.id} ({(n.data as ResourceNodeData).resourceType})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-[#9BA5B5] block mb-1">Target Ports (comma-separated)</label>
-                  <input
-                    type="text"
-                    value={portScanPorts}
-                    onChange={(e) => setPortScanPorts(e.target.value)}
-                    placeholder="21, 22, 23, 80, 443, 3306, 8080"
-                    className="w-full bg-[#171C26] border border-[#293140] rounded px-2.5 py-1.5 text-xs text-[#F3F5F8] focus:border-[#EC4899] focus:outline-none font-mono"
-                  />
-                </div>
-
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={handleExecutePortScan}
-                  loading={portScanLoading}
-                  disabled={!portScanSource || !portScanDest}
-                  icon={<Crosshair size={13} />}
-                  className="mt-2"
-                >
-                  {portScanLoading ? 'Scanning Ports...' : 'Execute Port Scan Attack'}
-                </Button>
-
-                <p className="text-[11px] text-[#9BA5B5] mt-1">
-                  Probes TCP ports across routers and perimeter firewalls. Detects open services, firewall-filtered ports, and closed sockets.
-                </p>
-              </div>
-
-              {/* Right Results Stream */}
-              <div className="flex-1 p-4 overflow-y-auto">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-[#9BA5B5] mb-3">
-                  Service Discovery & Fingerprint Stream
-                </h4>
-
-                {portScanEvents.length === 0 ? (
-                  <div className="h-44 flex flex-col items-center justify-center text-center text-xs text-[#9BA5B5]">
-                    Select an attacker node and victim server on the left, then click "Execute Port Scan Attack".
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {portScanEvents.map((pe, idx) => (
-                      <div
-                        key={pe.id || idx}
-                        className="p-3 bg-[#171C26] border border-[#293140] rounded flex items-center justify-between text-xs"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border font-mono ${getEventBadge(pe.event_type)}`}>
-                            {pe.event_type.replace('port_scan_', '').toUpperCase()}
-                          </span>
-                          <span className="font-semibold text-[#F3F5F8]">{pe.source_device_name || pe.source_device_id}</span>
-                          <ArrowRight size={13} className="text-[#9BA5B5]" />
-                          <span className="font-semibold text-[#F3F5F8]">{pe.dest_device_name || pe.dest_device_id}</span>
-                        </div>
-                        <div className="text-[#9BA5B5] max-w-sm truncate text-[11px]">{pe.summary}</div>
-                      </div>
-                    ))}
-                  </div>
                 )}
               </div>
             </div>
