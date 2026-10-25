@@ -1,25 +1,28 @@
-# RedLab Cursor AI Rules
+# RedLab Cursor AI Rules (v1.1.1)
 
 # Context & Product
-- Project: RedLab (Visual Cloud Security Lab MVP)
-- Stack: React 19 + TypeScript + Vite + Zustand + React Flow (Frontend) | FastAPI + SQLAlchemy + SQLite (Backend)
-- Theme: Dark Cybersecurity Laboratory (#0B0D12, #11151D, #171C26, #293140, #FF3B4E). Never use bright/white themes.
+- Project: RedLab (Visual Network Attack Simulation & Cyber Defense Laboratory)
+- Core Concept: Cisco Packet Tracer meets Kali Linux for educational cybersecurity.
+- Stack: React 19 + TypeScript + Vite + Zustand + React Flow (Frontend) | Python 3.14 + FastAPI + SQLAlchemy + SQLite (Backend)
+- Theme: Dark Cybersecurity Laboratory (#0B0D12, #11151D, #171C26, #293140, #FF3B4E). Never use bright or light themes.
 
 # Strict Architecture Guidelines
-1. State: Use Zustand (`useEditorStore` and `useLabStore`). Never put shared editor state in local component state.
-2. Canvas: Visual nodes/edges must adhere to `@xyflow/react` conventions and serialize cleanly to `GraphData` (nodes/edges).
-3. Security Rules: Must be deterministic Python classes subclassing `SecurityRule` in `backend/app/security_engine/registry.py`. Never hardcode mock findings in endpoints or frontend.
-4. Schemas: Keep `backend/app/schemas/lab.py` and `frontend/src/types/index.ts` synchronized.
-5. No External Cloud: Purely simulated. Do NOT call real AWS APIs or provision real cloud infrastructure.
+1. Zero Cloud Services: Strictly computer network security (TCP/IP, ICMP, ARP, firewalls, ports, subnets, routers, web servers). DO NOT introduce AWS, S3, IAM, or cloud SDKs.
+2. State: Use Zustand (`useEditorStore` and `useSimulationStore`). Never put shared lab or topology state in local component state.
+3. Canvas: Visual nodes/edges must adhere to `@xyflow/react` conventions and serialize cleanly to `GraphData` (nodes/edges).
+4. Deterministic Simulation: Attack executions and security rules must evaluate real topology graphs in `backend/app/network_engine/` and `backend/app/security_engine/`. Never hardcode mock findings or fake scans.
+5. Educational Forensics: Port scans and attacks must explain who closed ports (Kernel TCP RST vs Firewall DROP) and remediation steps.
+6. Schemas: Keep `backend/app/schemas/lab.py` and `frontend/src/types/index.ts` 100% synchronized.
+7. Simplified Beginner UI: Keep toolbar clean; use prominent Attack/Defend mode toggle and interactive Linux terminal.
 
 # Git Branching
-- Never commit to `main` or `develop`.
+- Never commit directly to `main` or `develop`.
 - Work only in designated feature branches:
-  - `feature/canvas-*` (Canvas & React Flow)
+  - `feature/canvas-*` (Canvas, cables, custom nodes)
   - `feature/ui-*` (Inspector forms, modals, dashboard)
-  - `feature/security-*` (Security engine rules, attack paths)
+  - `feature/security-*` (Network attack scenarios, rules, heuristics)
   - `feature/backend-*` (FastAPI endpoints, DB, import/export)
-  - `feature/qa-*` (Tests & CI)
+  - `feature/qa-*` (Tests & CI pipelines)
 - Follow conventional commits: `feat:`, `fix:`, `test:`, `refactor:`, `docs:`.
 
 # Testing Mandate

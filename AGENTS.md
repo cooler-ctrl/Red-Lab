@@ -48,9 +48,11 @@ redlab/
 │   │   ├── features/
 │   │   │   ├── dashboard/   # DashboardPage, LabCard, CreateLabModal
 │   │   │   ├── editor/      # EditorCanvas, ResourceLibrary, PropertyInspector, ResourceNode
-│   │   │   └── security/    # ScanPanel, FindingCard, AttackPathView
+│   │   │   ├── security/    # ScanPanel, FindingCard, AttackPathView
+│   │   │   ├── simulation/  # SimulationPanel, CompromisedScreenModal, PortForensicsInspector
+│   │   │   └── terminal/    # LinuxTerminal (Interactive Kali bash CLI simulation)
 │   │   ├── services/        # api.ts (REST client), exampleLab.ts
-│   │   ├── stores/          # Zustand stores (editorStore.ts, labStore.ts)
+│   │   ├── stores/          # Zustand stores (editorStore.ts, labStore.ts, simulationStore.ts)
 │   │   ├── test/            # Vitest unit & component tests
 │   │   ├── theme.ts         # Dark theme constants
 │   │   └── types/           # Canonical TypeScript interfaces (types/index.ts)
@@ -58,17 +60,20 @@ redlab/
 │   └── vite.config.ts
 ├── backend/                 # Python 3.14 + FastAPI + SQLAlchemy + SQLite
 │   ├── app/
-│   │   ├── api/             # FastAPI routers (api/labs.py)
+│   │   ├── api/             # FastAPI routers (api/labs.py, api/simulation.py)
 │   │   ├── core/            # Database engine (database.py), config (config.py)
 │   │   ├── models/          # SQLAlchemy models (models/lab.py)
 │   │   ├── schemas/         # Pydantic v2 schemas (schemas/lab.py)
 │   │   ├── services/        # Business logic & DB queries (services/lab_service.py)
+│   │   ├── network_engine/  # Attack scenarios, SYN flood, ICMP, and port forensics (simulator.py)
 │   │   ├── security_engine/ # Modular rule registry & analyzer (analyzer.py, registry.py)
-│   │   │   └── rules/       # 8 network security rules (network_rules.py)
+│   │   │   └── rules/       # Network security rules (network_rules.py)
 │   │   └── main.py          # FastAPI application entry point
-│   ├── tests/               # Pytest suite (test_api.py, test_security_engine.py)
+│   ├── tests/               # Pytest suite (test_api.py, test_network_engine.py, test_security_engine.py)
 │   └── requirements.txt
+├── desktop/                 # Electron desktop client packaging
 ├── docs/                    # Architecture, rules catalog, workflows
+├── TEAM_SYNC.txt            # Plain-text master team directive & subsystem map
 ├── AGENTS.md                # This file (AI model instructions)
 └── README.md                # Project documentation
 ```
@@ -144,3 +149,23 @@ npm test         # Must pass all Vitest tests
 4. Add property editor form fields in `frontend/src/features/editor/PropertyInspector.tsx`.
 5. Define valid edge connection rules in `frontend/src/features/editor/EditorCanvas.tsx`.
 6. Add relevant security checks in the backend security engine.
+
+---
+
+## 7. Current Version (1.1.1) Base Architecture & Domain Instructions
+
+### What Has Been Built (Do Not Regress):
+1. **Attack vs. Defend Studio Mode:** Prominent mode switcher in the top bar. Offense mode executes cyber attacks; Defense mode unlocks firewall ACL remediation and before/after verification.
+2. **Interactive Linux Terminal (`LinuxTerminal.tsx`):** Built-in Kali Linux bash emulator supporting `ping`, `nmap`, `hping3` (SYN flood), `hydra` (brute-force), `curl` (SQL injection), `iptables`, `netstat`, `route`, `forensics`, and `screen`.
+3. **Simulated Victim Screen (`CompromisedScreenModal.tsx`):** Visual display of the compromised host (HTTP 504 outage with live ping test, SQLi defaced website with dumped database tables, and Linux CRT tty1 root session breach).
+4. **Educational Port Forensics (`PortForensicsInspector.tsx`):** Detailed breakdown explaining why ports are Open, Closed (TCP RST by OS Kernel), or Filtered (dropped by Firewall ACL) and exact remediation steps.
+5. **Zero Cloud Services:** RedLab is completely dedicated to local network security (TCP/IP, ICMP, routing, firewalls, servers).
+
+### Domain Instructions for the 5 Feature Branches:
+- **Dev 1 (`feature/canvas-*`):** Owns `EditorCanvas.tsx`, `ResourceNode.tsx`, `ResourceLibrary.tsx`. Do NOT break `onConnect` cable self-healing mechanics or delete node state in `useEditorStore`.
+- **Dev 2 (`feature/ui-*`):** Owns `PropertyInspector.tsx`, modals, and `SimulationPanel.tsx`. Maintain the simplified beginner UI without adding clutter or re-introducing legacy scan buttons.
+- **Dev 3 (`feature/security-*`):** Owns `simulator.py`, `registry.py`, and `rules/`. Any new attack scenario must return complete forensics metadata (`PortForensicsEntry`) and deterministic outcomes.
+- **Dev 4 (`feature/backend-*`):** Owns FastAPI endpoints and persistence. Keep `schemas/lab.py` synchronized with `frontend/src/types/index.ts`.
+- **Dev 5 (`feature/qa-*`):** Owns Pytest and Vitest test suites. Ensure 100% passing tests (`pytest tests/` and `npm test`) before recommending merge.
+- **Consult `TEAM_SYNC.txt`:** For full plain-text instructions.
+

@@ -1,0 +1,230 @@
+================================================================================
+REDLAB 1.1.1 — ENGINEERING TEAM SYNC & AI AGENT ARCHITECTURAL DIRECTIVE
+================================================================================
+LAST UPDATED: 2026-10-25
+BRANCH: feature/security-network-attacks (Lead Architect / Owner)
+PRODUCT: RedLab (Visual Network Attack Simulation & Cyber Defense Laboratory)
+CORE CONCEPT: Cisco Packet Tracer meets Kali Linux for educational cybersecurity.
+TARGET AUDIENCE: Cybersecurity students, network engineering classes, ethical hackers.
+================================================================================
+
+--------------------------------------------------------------------------------
+1. EXECUTIVE SUMMARY: WHAT HAS BEEN BUILT & HOW THE BASE CURRENTLY WORKS
+--------------------------------------------------------------------------------
+RedLab has evolved from initial static concepts into an interactive visual
+network attack and defense simulation platform. All legacy cloud/AWS concepts
+have been completely removed. The application runs locally, offline, and self-
+contained with zero paid cloud dependencies, zero external network calls, and
+zero fake buttons.
+
+KEY FEATURES BUILT & OPERATIONAL IN V1.1.1:
+
+1. Top-Level Mode Architecture:
+   - "ATTACK STUDIO" (Offensive Mode) vs "DEFEND STUDIO" (Defensive Mode).
+   - A single prominent toggle at the top switches modes cleanly.
+   - Offense mode unlocks exploit tools, automated attacks, and reconnaissance.
+   - Defense mode locks down attack tools and activates ACL remediation, firewall
+     configuration, and verification suites.
+
+2. Visual Network Topology Canvas (React Flow):
+   - Supports 6 core network devices: PC, Router, Switch, Server, Firewall, External WAN.
+   - Custom SVG icons, live status badges, IP/Subnet annotations.
+   - Automatic cable reconnection & self-healing edge mechanics.
+   - Single source of truth is Zustand (`useEditorStore`).
+
+3. Interactive Linux Attack Terminal (Kali-style bash simulation):
+   - Located directly on the bottom simulation drawer under "Terminal".
+   - Commands supported:
+     * Recon: nmap (SYN stealth port scan), ping (ICMP reachability test)
+     * Exploits: hping3 (SYN Flood DoS), hydra (SSH brute force), curl (SQLi)
+     * Diagnostics: ip a, ifconfig, route -n, iptables -L -n, netstat, hosts
+     * Forensics & Victim View: forensics, ports, screen, victim, monitor
+   - When targets are overwhelmed by SYN flood, `ping` accurately reports 100%
+     packet loss and socket queue exhaustion.
+
+4. Educational Port Forensics Engine ("Who Closed It & How?"):
+   - Solves the fundamental learning gap for networking students.
+   - Probes common ports (21/FTP, 22/SSH, 23/Telnet, 80/HTTP, 443/HTTPS, 3306/MySQL, 8080/App).
+   - For every port, clearly explains:
+     * State: OPEN, CLOSED, or FILTERED.
+     * Who Closed/Decided: Target OS Kernel vs Perimeter Firewall ACL vs Daemon.
+     * How It Got Closed: TCP RST packet returned vs silent firewall packet drop.
+     * Attacker Takeaway: Host presence revealed vs host presence hidden.
+     * Defender Advice & Remediation: Exact rules/commands to apply.
+
+5. Simulated Target Victim Monitor Screen:
+   - Accessible via the "🖥️ View Target Victim Screen" button or terminal `screen`.
+   - Web Server Screen:
+     * HTTP 504 Gateway Timeout Outage screen with live ICMP ping test widget.
+     * SQL Injection Defacement screen ("HACKED BY REDLAB TEAM") with dumped database table.
+     * Healthy online 200 OK enterprise status monitor.
+   - Linux Server Screen:
+     * Simulated CRT / tty1 terminal showing unauthorized root session compromise,
+       `/etc/shadow` credential dump, and active backdoor alert.
+   - One-click "Switch to DEFEND MODE to Restore Target" button.
+
+6. Deterministic Defense Verification:
+   - Students remediate misconfigurations (e.g., adding firewall drop rules,
+     changing default deny actions, enabling SYN cookies).
+   - One-click "Verify Defense": runs automated rescan and produces side-by-side
+     before/after evidence comparison (e.g. "Vulnerability Remediated: Exploit Blocked").
+
+7. Standalone Desktop Release:
+   - Fully packaged Electron + Python PyInstaller bundle for macOS (`RedLab-1.1.1.dmg`).
+
+--------------------------------------------------------------------------------
+2. ARCHITECTURAL GUARDRAILS — DO NOT RUIN THE BASE
+--------------------------------------------------------------------------------
+To any human developer or AI model (Cursor, Claude, Copilot, ChatGPT, Antigravity)
+working in feature branches:
+
+RULE 1: ABSOLUTELY NO CLOUD SERVICES OR AWS SDKs.
+  RedLab is NOT an AWS security auditor. Do NOT add S3, IAM, CloudTrail, AWS SDKs,
+  boto3, or cloud icons. The platform is dedicated to Computer Networking
+  (TCP/IP, ICMP, ARP, Subnets, Routers, Switches, Firewalls, Web Servers).
+
+RULE 2: NO FAKE SCANS, NO FAKE BUTTONS, NO HARDCODED RESULTS.
+  All network events, port scans, and attack simulations must execute through the
+  deterministic backend engine (`app/network_engine/` and `app/security_engine/`).
+
+RULE 3: STRICT DARK CYBERSECURITY AESTHETIC.
+  Backgrounds: #0B0D12 (canvas/main), #11151D (sidebar/subpanels), #171C26 (cards).
+  Borders: #293140.
+  Text: #F3F5F8 (primary), #9BA5B5 (muted/secondary).
+  Accents: Red #FF3B4E (exploit/critical), Orange #FF8A4C, Yellow #F5C451,
+           Blue #60A5FA (info/links), Emerald #34D399 (secure/defended).
+  DO NOT introduce white backgrounds, light mode toggles, or glassmorphism.
+
+RULE 4: ZUSTAND IS THE SINGLE SOURCE OF TRUTH.
+  Global canvas nodes, edges, active lab, and selected nodes live in `useEditorStore`.
+  Simulation runs and attack responses live in `useSimulationStore`.
+  Never duplicate graph topology into local React `useState`.
+
+RULE 5: SYNCHRONIZED SCHEMAS.
+  If you modify schemas in `backend/app/schemas/lab.py`, you MUST update
+  `frontend/src/types/index.ts` to keep both ends in 100% TypeScript/Pydantic parity.
+
+RULE 6: MANDATORY TEST PASSING BEFORE MERGING.
+  Backend: `cd backend && python3 -m pytest tests/ -v` (Must pass all 72 tests).
+  Frontend: `cd frontend && npm run build && npm test` (Must pass with 0 errors).
+
+--------------------------------------------------------------------------------
+3. TEAM DOMAIN MAP & WHERE TO START FOR EACH BRANCH
+--------------------------------------------------------------------------------
+There are 5 core contributors working alongside the Lead Architect. Each member
+and their AI agents MUST work in their respective branch:
+
+--------------------------------------------------------------------------------
+DEV 1: Visual Canvas & Graph Engine
+Branch Prefix: feature/canvas-*
+Primary Scope:
+  - `frontend/src/features/editor/EditorCanvas.tsx`
+  - `frontend/src/features/editor/ResourceNode.tsx`
+  - `frontend/src/features/editor/ResourceLibrary.tsx`
+Where to Start:
+  1. Inspect `EditorCanvas.tsx`: Notice how cables and node drag-and-drop operate.
+  2. Potential Tasks:
+     - Add animated packet flow lines along edges during active attacks / pings.
+     - Add visual port labels (e.g. ":80", ":22") on connecting cables.
+     - Enhance canvas zoom controls and grid snapping.
+  What NOT to Ruin:
+     - Do not touch `onConnect` cable self-healing mechanics or delete node logic
+       in `useEditorStore`.
+
+--------------------------------------------------------------------------------
+DEV 2: Forms, Inspector, Modals & UX
+Branch Prefix: feature/ui-*
+Primary Scope:
+  - `frontend/src/features/editor/PropertyInspector.tsx`
+  - `frontend/src/features/simulation/SimulationPanel.tsx`
+  - `frontend/src/features/simulation/CompromisedScreenModal.tsx`
+  - `frontend/src/features/simulation/PortForensicsInspector.tsx`
+  - `frontend/src/features/dashboard/DashboardPage.tsx`
+Where to Start:
+  1. Inspect `PropertyInspector.tsx`: Examine how device configurations (IP,
+     subnet, default gateway, services, firewall ACL rules) are rendered.
+  2. Potential Tasks:
+     - Add beginner-friendly tooltips explaining CIDR prefixes (/24, /16).
+     - Add preset firewall templates ("Web Server DMZ", "Drop All Telnet").
+     - Enhance the victim screen modal with additional defacement templates.
+  What NOT to Ruin:
+     - Keep the UI streamlined for beginners. Do not clutter the top toolbar or
+       re-introduce unnecessary scan panels.
+
+--------------------------------------------------------------------------------
+DEV 3: Security Engine & Network Attack Scenarios
+Branch Prefix: feature/security-*
+Primary Scope:
+  - `backend/app/network_engine/simulator.py`
+  - `backend/app/security_engine/registry.py`
+  - `backend/app/security_engine/rules/`
+Where to Start:
+  1. Inspect `backend/app/network_engine/simulator.py`: Examine `execute_attack_scenario()`
+     and `assess_defense()`.
+  2. Potential Tasks:
+     - Add new attack scenarios (e.g., DNS Spoofing, DHCP Starvation, Reverse Shell).
+     - Add custom port forensics entries for new services (e.g., DNS on 53, RDP on 3389).
+     - Expand `backend/app/security_engine/rules/network_rules.py` with additional
+       security audit checks.
+  What NOT to Ruin:
+     - Every new rule must inherit from `SecurityRule` in `registry.py`.
+     - Scenarios must return valid `PortForensicsEntry` and deterministic outcome tags.
+
+--------------------------------------------------------------------------------
+DEV 4: Backend API, Models & Persistence
+Branch Prefix: feature/backend-*
+Primary Scope:
+  - `backend/app/api/labs.py`
+  - `backend/app/api/simulation.py`
+  - `backend/app/models/lab.py`
+  - `backend/app/schemas/lab.py`
+  - `backend/app/services/lab_service.py`
+Where to Start:
+  1. Inspect `backend/app/api/simulation.py`: Notice how `/api/labs/{id}/attack`
+     and `/api/labs/{id}/verify-defense` endpoints are routed.
+  2. Potential Tasks:
+     - Add export lab as PCAP file or Wireshark trace format.
+     - Add lab export as educational PDF or Markdown report.
+     - Optimize SQLite database queries and lab session persistence.
+  What NOT to Ruin:
+     - Do not break the Pydantic schema contracts in `schemas/lab.py`.
+
+--------------------------------------------------------------------------------
+DEV 5: QA, Testing, Integration & CI
+Branch Prefix: feature/qa-*
+Primary Scope:
+  - `backend/tests/` (test_api.py, test_network_engine.py, test_security_engine.py)
+  - `frontend/src/test/` (FindingCard.test.tsx, simulationStore.test.ts, stores.test.ts)
+  - `.github/workflows/` (ci.yml)
+Where to Start:
+  1. Run `python3 -m pytest tests/ -v` and `npm test` to see existing test coverage.
+  2. Potential Tasks:
+     - Add component unit tests for `PortForensicsInspector.tsx` and `CompromisedScreenModal.tsx`.
+     - Add end-to-end simulation tests verifying the DDoS ping degradation flow.
+     - Set up automated GitHub Actions workflow to run pytest and Vitest on PRs.
+  What NOT to Ruin:
+     - Never weaken test assertions to pass failing builds.
+
+--------------------------------------------------------------------------------
+4. HOW TO SYNC WITH THE ARCHITECT'S WORK
+--------------------------------------------------------------------------------
+Before starting any new feature branch:
+
+1. Fetch latest changes from remote:
+   git fetch origin
+
+2. Merge or rebase onto `feature/security-network-attacks` or `develop`:
+   git checkout feature/<your-domain>-<feature-description>
+   git merge origin/feature/security-network-attacks
+
+3. Verify your local environment:
+   # Backend:
+   cd backend
+   python3 -m pytest tests/ -v
+   # Frontend:
+   cd frontend
+   npm run build
+   npm test
+
+4. Develop your changes cleanly, write corresponding tests, and submit a PR!
+================================================================================
