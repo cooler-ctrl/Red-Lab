@@ -1,6 +1,6 @@
 # RedLab — Architecture & System Design Document
 
-**Version:** 1.1.0  
+**Version:** 1.1.1  
 **Status:** Functional  
 **Target Architecture:** Visual Network Security & Attack Simulation Platform  
 

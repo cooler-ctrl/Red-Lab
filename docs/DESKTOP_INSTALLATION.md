@@ -7,9 +7,9 @@ RedLab is packaged as a standalone, downloadable desktop software for **macOS** 
 ## 1. Downloads & Installers
 
 ### macOS (Apple Silicon M1/M2/M3/M4 & Intel x86_64)
-- **Disk Image (`.dmg`):** `RedLab-1.0.0.dmg`
+- **Disk Image (`.dmg`):** `RedLab-1.1.1.dmg`
   - Double-click the DMG and drag **RedLab** into your `/Applications` folder.
-- **Standalone Archive (`.zip`):** `RedLab-1.0.0-mac.zip`
+- **Standalone Archive (`.zip`):** `RedLab-1.1.1-mac.zip`
   - Unzip and launch `RedLab.app` directly.
 
 > **macOS Security Gatekeeper Note:**  
@@ -23,10 +23,10 @@ RedLab is packaged as a standalone, downloadable desktop software for **macOS** 
 ---
 
 ### Windows PC (Windows 10 & Windows 11 64-bit)
-- **Standard Installer (`.exe`):** `RedLab Setup 1.0.0.exe`
+- **Standard Installer (`.exe`):** `RedLab Setup 1.1.1.exe`
   - Graphical NSIS setup wizard with desktop icon and Start Menu shortcuts.
   - Automatically installs for current user or all users.
-- **Portable Edition (`.exe`):** `RedLab 1.0.0.exe`
+- **Portable Edition (`.exe`):** `RedLab 1.1.1.exe`
   - Fully self-contained portable executable.
   - Run directly from any folder or USB drive with zero installation.
 
@@ -82,8 +82,8 @@ chmod +x scripts/package-mac.sh
 ```
 
 The output installers will be generated in `desktop/dist/`:
-- `desktop/dist/RedLab-1.0.0.dmg`
-- `desktop/dist/RedLab-1.0.0-mac.zip`
+- `desktop/dist/RedLab-1.1.1.dmg`
+- `desktop/dist/RedLab-1.1.1-mac.zip`
 
 ---
 
@@ -103,8 +103,8 @@ cd redlab
 ```
 
 The output installers will be generated in `desktop\dist\`:
-- `desktop\dist\RedLab Setup 1.0.0.exe` (NSIS Installer)
-- `desktop\dist\RedLab 1.0.0.exe` (Standalone Portable)
+- `desktop\dist\RedLab Setup 1.1.1.exe` (NSIS Installer)
+- `desktop\dist\RedLab 1.1.1.exe` (Standalone Portable)
 
 ---
 
@@ -115,8 +115,8 @@ RedLab includes a turnkey GitHub Actions workflow at `.github/workflows/build-de
 ### How to Trigger Builds via GitHub:
 1. **Push a Release Tag:**
    ```bash
-   git tag v1.0.0
-   git push origin v1.0.0
+   git tag v1.1.1
+   git push origin v1.1.1
    ```
 2. **Manual Dispatch (One-Click):**
    - Go to your repository on GitHub.

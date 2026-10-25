@@ -82,8 +82,8 @@
 ## Desktop Software (macOS & Windows)
 
 RedLab is available as a standalone, downloadable desktop software with zero external setup required:
-- **macOS:** Downloadable `.dmg` disk image and `.zip` archive (Universal Apple Silicon & Intel).
-- **Windows PC:** Graphical installer (`RedLab Setup 1.0.0.exe`) and portable executable (`RedLab 1.0.0.exe`).
+- **macOS:** Downloadable `.dmg` disk image (`RedLab-1.1.1.dmg`) and `.zip` archive (`RedLab-1.1.1-mac.zip`).
+- **Windows PC:** Graphical installer (`RedLab Setup 1.1.1.exe`) and portable executable (`RedLab 1.1.1.exe`).
 
 For full download instructions and build scripts, consult the [Desktop Installation Guide](docs/DESKTOP_INSTALLATION.md).
 
