@@ -49,14 +49,17 @@ canvas-*  ui-*    security-* backend-* qa-*
 
 ### Allowed Branch Prefixes by Role
 
-| Role | Domain / Subsystem | Branch Prefix |
+> **EXCLUSIVE LEAD APPROVAL POLICY:**  
+> **Only Pashtrik Maliqi (@cooler-ctrl)** can review and approve pull requests and merges into `main`. Direct pushes to `main` are strictly forbidden.
+
+| Member & Role | Domain / Subsystem | Allowed Branch Prefix & Dedicated Branch |
 | :--- | :--- | :--- |
-| **Lead Architect** | Schemas, integrations, release reviews | `main`, `develop`, `release/*` |
-| **Dev 1** | Visual Canvas, React Flow, Node Geometry | `feature/canvas-<name>` |
-| **Dev 2** | UI, Inspector, Forms, Dashboard, Modals | `feature/ui-<name>` |
-| **Dev 3** | Security Engine, Rules, Detection Algorithms | `feature/security-<name>` |
-| **Dev 4** | Backend API, Database, Persistence, Services | `feature/backend-<name>` |
-| **Dev 5** | QA, Automated Testing, DevSecOps, CI/CD | `feature/qa-<name>`, `test/*` |
+| **Pashtrik Maliqi** (Lead Architect & Owner) | Schemas, integrations, release reviews, sole approval | `main`, `develop`, `release/*` |
+| **Aridoni** (API & Backend Developer) | Backend API, services, auth, simulation logic | `feature/backend-*`, `feature/backend-aridoni` |
+| **Engjulli** (Cyberattack Simulation Developer) | Security Engine, attack scenarios, telemetry | `feature/security-*`, `feature/security-engjulli` |
+| **Lavda** (Database & Web App Developer) | Database schema, models, persistence, history | `feature/database-*`, `feature/database-lavda`, `feature/backend-lavda` |
+| **Basha** (Frontend Web Developer) | Visual Canvas, React Flow, Node Geometry, Web UI | `feature/canvas-*`, `feature/canvas-basha`, `feature/frontend-basha` |
+| **Nazmi** (Solution Architect & Frontend Dev) | UI, Inspector, Forms, Dashboard, Modals, UX | `feature/ui-*`, `feature/ui-nazmi`, `feature/frontend-nazmi` |
 | **Bugfixes** | Bug resolutions across domains | `fix/<issue-name>` |
 
 ---

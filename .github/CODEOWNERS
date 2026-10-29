@@ -1,0 +1,12 @@
+# ==============================================================================
+# RedLab Repository — Code Owners & Mandatory Approvers
+# ==============================================================================
+# Project Lead & Lead Architect: Pashtrik Maliqi (@cooler-ctrl)
+#
+# POLICY:
+# - All code changes require approval from Pashtrik Maliqi (@cooler-ctrl).
+# - Only Pashtrik Maliqi is authorized to approve pull requests and merges into 'main' and 'develop'.
+# - Direct pushes to 'main' are strictly forbidden.
+# ==============================================================================
+
+* @cooler-ctrl

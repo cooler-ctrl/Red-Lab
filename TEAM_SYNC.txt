@@ -1,8 +1,16 @@
 ================================================================================
 REDLAB 1.1.1 — ENGINEERING TEAM SYNC & AI AGENT ARCHITECTURAL DIRECTIVE
 ================================================================================
-LAST UPDATED: 2026-10-25
-BRANCH: feature/security-network-attacks (Lead Architect / Owner)
+LAST UPDATED: 2026-10-29
+LEAD ARCHITECT & OWNER: Pashtrik Maliqi (@cooler-ctrl)
+TEAM ASSIGNMENTS:
+  - Pashtrik Maliqi: Lead Architect & Project Lead (sole approver for main)
+  - Aridoni: API & Backend Developer (branch: feature/backend-aridoni)
+  - Engjulli: Cyberattack Simulation Developer (branch: feature/security-engjulli)
+  - Lavda: Database & Web Application Developer (branch: feature/database-lavda)
+  - Basha: Frontend Web Developer (branch: feature/canvas-basha)
+  - Nazmi: Solution Architect & Frontend App Dev (branch: feature/ui-nazmi)
+EXCLUSIVE MERGE POLICY: Only Pashtrik Maliqi is authorized to approve merges and pushes into main.
 PRODUCT: RedLab (Visual Network Attack Simulation & Cyber Defense Laboratory)
 CORE CONCEPT: Cisco Packet Tracer meets Kali Linux for educational cybersecurity.
 TARGET AUDIENCE: Cybersecurity students, network engineering classes, ethical hackers.

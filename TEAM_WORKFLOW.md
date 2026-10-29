@@ -1,23 +1,26 @@
 # RedLab — Team Collaboration & Git Branching Guide
 
-**Lead:** You (Repository Owner & Lead Architect)  
-**Team Size:** 6 Engineers (1 Lead + 5 Core Contributors)  
+**Lead Architect & Project Lead:** Pashtrik Maliqi (@cooler-ctrl)  
+**Team Size:** 6 Engineers (Pashtrik Maliqi [Lead] + Aridoni, Engjulli, Lavda, Basha, Nazmi)  
 **Methodology:** GitFlow-inspired Feature Branching with Mandatory Code Reviews & Automated Testing  
+
+> **EXCLUSIVE LEAD APPROVAL POLICY:**  
+> **Only Pashtrik Maliqi (@cooler-ctrl)** is authorized to approve pull requests, merges, and releases into `main`. Direct pushes to `main` are strictly blocked. All contributions merge through PRs reviewed and approved by Pashtrik.
 
 ---
 
 ## 1. Team Domain & Ownership Matrix
 
-To prevent overlapping edits and merge conflicts, each team member owns a specific subsystem. Whenever an AI model is used by a team member, it should know their exact area of responsibility.
+To prevent overlapping edits and merge conflicts, each team member owns a specific subsystem:
 
-| Member | Focus Area | Key Responsibilities | Primary Directories / Files | Branch Prefix |
+| Member | Role & Focus Area | Key Responsibilities | Primary Directories / Files | Branch Prefix & Dedicated Branch |
 | :--- | :--- | :--- | :--- | :--- |
-| **Lead (You)** | **System Architect & Release Manager** | Core schemas, API contract stability, PR reviews, release tagging, database migrations | Entire repo (`app/schemas/`, `types/index.ts`, `docs/`) | `main`, `develop`, `release/*` |
-| **Dev 1** | **Visual Canvas & Graph Engine** | React Flow integration, custom node rendering, connection validation logic, drag-and-drop mechanics, cable repair | `frontend/src/features/editor/EditorCanvas.tsx`, `ResourceNode.tsx`, `exampleLab.ts` | `feature/canvas-*` |
-| **Dev 2** | **Forms, Inspector, Modals & UX** | Dynamic property inspector, firewall ACL rule editor, port service bindings, victim screen modal, dashboard | `frontend/src/features/editor/PropertyInspector.tsx`, `CompromisedScreenModal.tsx`, `SimulationPanel.tsx` | `feature/ui-*` |
-| **Dev 3** | **Network & Security Simulation Engine** | Python network attack simulator, SYN flood telemetry, port forensics heuristics, rule registry | `backend/app/network_engine/`, `backend/app/security_engine/` (`rules/`, `registry.py`) | `feature/security-*` |
-| **Dev 4** | **Backend API & Data Persistence** | FastAPI routers, SQLAlchemy models, SQLite persistence, lab JSON import/export validation | `backend/app/api/`, `backend/app/models/`, `backend/app/services/` | `feature/backend-*` |
-| **Dev 5** | **QA, Testing & DevSecOps** | Pytest suites, Vitest component tests, end-to-end user journeys, GitHub Actions CI workflow | `backend/tests/`, `frontend/src/test/`, `.github/workflows/` | `feature/qa-*` |
+| **Pashtrik Maliqi** | **Lead Architect & Project Lead (Owner)** | Overall system design, technical direction, code quality, final releases, merge approvals | Entire repo (`app/schemas/`, `types/index.ts`, `docs/`) | `main`, `develop`, `release/*` |
+| **Aridoni** | **API & Backend Developer** | REST APIs, backend application logic, authentication, session management, simulation requests | `backend/app/api/`, `backend/app/services/` | `feature/backend-*`, `feature/backend-aridoni` |
+| **Engjulli** | **Cyberattack Simulation Developer** | Red-team attack simulation engine, attack scenarios, device/host attack models, event logs | `backend/app/network_engine/`, `backend/app/security_engine/` | `feature/security-*`, `feature/security-engjulli` |
+| **Lavda** | **Database & Web Application Developer** | Data architecture, DB schemas, SQLAlchemy models, persistence, scenario/user history | `backend/app/models/`, `backend/app/core/database.py`, scenario storage | `feature/database-*`, `feature/database-lavda`, `feature/backend-lavda` |
+| **Basha** | **Frontend Web Developer** | Web interface, reusable UI components, visual network canvas editor, topology configuration | `frontend/src/features/editor/EditorCanvas.tsx`, `ResourceNode.tsx`, `ResourceLibrary.tsx` | `feature/canvas-*`, `feature/canvas-basha`, `feature/frontend-basha` |
+| **Nazmi** | **Solution Architect & Frontend Application Developer** | Technical solution design, core application screens, navigation, state management, UI flows | `frontend/src/features/editor/PropertyInspector.tsx`, `SimulationPanel.tsx`, `LinuxTerminal.tsx` | `feature/ui-*`, `feature/ui-nazmi`, `feature/frontend-nazmi` |
 
 ---
 
@@ -37,7 +40,7 @@ canvas-*    ui-*     security-* backend-* qa-*
 ```
 
 ### 2.1 Branch Hierarchy
-1. **`main`**: Production-ready, stable codebase. Only merges come from `develop` via Lead approval. Direct pushes are blocked.
+1. **`main`**: Production-ready, stable codebase. Only merges come from `develop` via Lead approval from Pashtrik Maliqi (@cooler-ctrl). Direct pushes to `main` are strictly forbidden and blocked by GitHub branch protection.
 2. **`develop`**: Active integration branch. All feature branches branch off `develop` and merge back into `develop` via Pull Requests.
 3. **`feature/<role>-<feature-name>`**: Individual feature development branches. Isolated from other teammates.
 4. **`fix/<issue-name>`**: Dedicated bugfix branches.

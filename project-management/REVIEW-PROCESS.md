@@ -80,27 +80,29 @@ stateDiagram-v2
 4. The author requests re-review.
 
 ### Phase 6: Merge & Completion (`Approved` $\rightarrow$ `Merged`)
-1. Once approved, the Lead or designated reviewer merges the PR using **Squash and Merge** or **Rebase and Merge** to maintain a clean git history.
+1. Once approved, **Pashtrik Maliqi (@cooler-ctrl)** (Lead Architect & Owner) merges the PR using **Squash and Merge** or **Rebase and Merge** to maintain a clean git history. No other team member is authorized to merge into `main` or `develop`.
 2. The author deletes the remote feature branch.
 3. The linked GitHub Issue is automatically closed and marked `Approved`.
 
 ---
 
-## 3. Recommended GitHub Branch Protection Settings
+## 3. GitHub Branch Protection Settings (Enforced)
 
-To ensure the review process is strictly enforced, the following branch protection rules should be configured in GitHub repository settings:
+To ensure the review process is strictly enforced, branch protection rules are configured on `cooler-ctrl/Red-Lab` for `main` and `develop`:
+
+> **EXCLUSIVE LEAD APPROVAL POLICY:**  
+> All PRs targeting `main` require approval from Code Owner **Pashtrik Maliqi (@cooler-ctrl)** per `.github/CODEOWNERS`. Direct pushes to `main` are blocked.
 
 ### Target Branch: `main` & `develop`
 1. **Require a pull request before merging:**
    - Minimum required approvals: **1 reviewer**.
    - Dismiss stale pull request approvals when new commits are pushed: **Enabled**.
-   - Require review from Code Owners: **Enabled**.
+   - Require review from Code Owners (`@cooler-ctrl`): **Enabled**.
 2. **Require status checks to pass before merging:**
    - Require branches to be up to date before merging: **Enabled**.
    - Required status checks:
-     - `backend-checks` (Pytest + Ruff)
+     - `backend-checks` (Pytest)
      - `frontend-checks` (Vitest + TypeScript build)
-     - `security-scan` (Dependency audits)
 3. **Require conversation resolution before merging:** **Enabled**.
 4. **Require signed commits:** Recommended.
-5. **Do not allow bypassing the above settings:** Enforce for all team members (including administrators).
+5. **Direct pushes blocked:** Only PRs reviewed and approved by Pashtrik Maliqi can be merged.

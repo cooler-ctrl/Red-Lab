@@ -22,29 +22,33 @@ Welcome to the RedLab project management system. This directory defines the oper
 
 To prevent overlapping edits and merge conflicts, each member operates within dedicated subsystem boundaries:
 
+> **EXCLUSIVE LEAD APPROVAL POLICY:**  
+> **Pashtrik Maliqi (@cooler-ctrl)** is the **Lead Architect & Project Lead**.  
+> **ONLY Pashtrik Maliqi has the authority to approve pull requests, merges, and pushes into `main`.**
+
 ```
                                   ┌─────────────────────────────┐
-                                  │      Team Lead (Owner)      │
+                                  │   Pashtrik Maliqi (Lead)    │
                                   │ Architecture & Integrations │
                                   └──────────────┬──────────────┘
                                                  │
           ┌─────────────────┬────────────────────┼───────────────────┬─────────────────┐
           │                 │                    │                   │                 │
 ┌─────────┴─────────┐ ┌─────┴───────────┐ ┌──────┴──────────┐ ┌──────┴─────────┐ ┌─────┴───────────┐
-│       Dev 1       │ │      Dev 2      │ │      Dev 3      │ │      Dev 4      │ │      Dev 5      │
-│  Visual Canvas &  │ │ Inspector, UI & │ │ Security Engine │ │ Backend API &   │ │ QA, Testing &   │
-│   Graph Engine    │ │    Dashboard    │ │   & Sandboxes   │ │ Data Storage    │ │   DevSecOps     │
+│       Basha       │ │      Nazmi      │ │     Engjulli    │ │     Aridoni     │ │      Lavda      │
+│  Visual Canvas &  │ │ Solution Arch & │ │ Cyberattack Sim │ │  API & Backend  │ │ Database & Web  │
+│    Web Frontend   │ │   UI Screens    │ │     Engine      │ │    Developer    │ │   App Developer │
 └───────────────────┘ └─────────────────┘ └─────────────────┘ └─────────────────┘ └─────────────────┘
 ```
 
-| Role | Primary Domain | Core Directories / Files | Branch Prefix |
+| Member & Role | Primary Domain | Core Directories / Files | Branch Prefix & Dedicated Branch |
 | :--- | :--- | :--- | :--- |
-| **Lead (Owner)** | System Architecture, Schemas, Release Management | `app/schemas/`, `types/index.ts`, `docs/`, `project-management/` | `main`, `develop`, `release/*` |
-| **Dev 1** | Visual Canvas, React Flow, Graph Geometry | `frontend/src/features/editor/EditorCanvas.tsx`, `ResourceNode.tsx` | `feature/canvas-*` |
-| **Dev 2** | Inspector, Forms, Modals, Navigation | `frontend/src/features/editor/PropertyInspector.tsx`, `features/dashboard/` | `feature/ui-*` |
-| **Dev 3** | Security Rules, Detection, Attack Engine | `backend/app/security_engine/`, sandbox controllers | `feature/security-*` |
-| **Dev 4** | FastAPI Routers, SQLAlchemy, Persistence | `backend/app/api/`, `backend/app/models/`, `backend/app/services/` | `feature/backend-*` |
-| **Dev 5** | QA, Automated Testing, CI/CD, Sandboxing | `backend/tests/`, `frontend/src/test/`, `.github/workflows/` | `feature/qa-*`, `test/*` |
+| **Pashtrik Maliqi** — Lead Architect & Project Lead | System Architecture, Schemas, Release Management & Sole Approver for `main` | `app/schemas/`, `types/index.ts`, `docs/`, `project-management/` | `main`, `develop`, `release/*` |
+| **Aridoni** — API & Backend Developer | REST APIs, backend logic, authentication, simulation request validation | `backend/app/api/`, `backend/app/services/` | `feature/backend-*`, `feature/backend-aridoni` |
+| **Engjulli** — Cyberattack Simulation Developer | Red-team attack simulation engine, attack scenarios, network events | `backend/app/network_engine/`, `backend/app/security_engine/` | `feature/security-*`, `feature/security-engjulli` |
+| **Lavda** — Database & Web Application Developer | Data architecture, DB schemas, models, persistence, scenario history | `backend/app/models/`, `backend/app/core/database.py` | `feature/database-*`, `feature/database-lavda`, `feature/backend-lavda` |
+| **Basha** — Frontend Web Developer | Visual Canvas, React Flow, Node Geometry, Web UI components | `frontend/src/features/editor/EditorCanvas.tsx`, `ResourceNode.tsx` | `feature/canvas-*`, `feature/canvas-basha`, `feature/frontend-basha` |
+| **Nazmi** — Solution Architect & Frontend App Dev | Solution design, core application screens, navigation, state management | `frontend/src/features/editor/PropertyInspector.tsx`, `SimulationPanel.tsx` | `feature/ui-*`, `feature/ui-nazmi`, `feature/frontend-nazmi` |
 
 ---
 

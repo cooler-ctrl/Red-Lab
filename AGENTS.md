@@ -21,20 +21,25 @@
 
 There are **6 team members** on this project. Every member works in an isolated Git branch. **Never commit directly to `main` or `develop`.**
 
-| Role | Domain / Scope | Allowed Branch Prefixes |
+> **LEAD APPROVAL POLICY:**  
+> **Pashtrik Maliqi (@cooler-ctrl)** is the **Lead Architect & Project Lead**.  
+> **ONLY Pashtrik Maliqi has the authority to approve pull requests, merges, and pushes into `main` and `develop`.**
+
+| Member & Role | Domain / Scope | Dedicated Branch & Prefix |
 | :--- | :--- | :--- |
-| **Team Lead (Owner)** | Architecture, core schemas, release reviews, integration | `main`, `develop`, `release/*` |
-| **Dev 1 (Canvas & Graph)** | React Flow visual editor, node connectors, canvas UX | `feature/canvas-*` |
-| **Dev 2 (UI & Inspector)** | Inspector forms, ACL/service editors, dashboard, modals | `feature/ui-*` |
-| **Dev 3 (Security Engine)** | Python network rules, registry, attack-path heuristics | `feature/security-*` |
-| **Dev 4 (Backend & DB)** | FastAPI endpoints, SQLAlchemy models, import/export | `feature/backend-*` |
-| **Dev 5 (QA & Testing)** | Pytest, Vitest, integration tests, CI pipelines | `feature/qa-*`, `test/*` |
+| **Pashtrik Maliqi** — Lead Architect & Project Lead (Owner) | Overall system architecture, technical leadership, schema stability, integration, release approvals | `main`, `develop`, `release/*` |
+| **Aridoni** — API & Backend Developer | REST APIs, backend services, auth/session management, simulation request validation | `feature/backend-*`, `feature/backend-aridoni` |
+| **Engjulli** — Cyberattack Simulation Developer | Red-team attack simulation engine, exploit scenarios, event logs, sandboxed execution | `feature/security-*`, `feature/security-engjulli` |
+| **Lavda** — Database & Web Application Developer | Data architecture, DB schema & models, persistence, scenario/user history | `feature/database-*`, `feature/database-lavda`, `feature/backend-lavda` |
+| **Basha** — Frontend Web Developer | Web interface, reusable UI components, visual network canvas editor, topology configuration | `feature/canvas-*`, `feature/canvas-basha`, `feature/frontend-basha` |
+| **Nazmi** — Solution Architect & Frontend Application Developer | Solution design, core application screens, navigation, state management, UI flows | `feature/ui-*`, `feature/ui-nazmi`, `feature/frontend-nazmi` |
 
 ### Git Rules for the AI Assistant:
 1. When asked to create or switch branches, use `git checkout -b feature/<your-domain>-<feature-description>`.
 2. Format commit messages following Conventional Commits:  
    `feat(scope): ...`, `fix(scope): ...`, `test(scope): ...`, `docs(scope): ...`.
 3. Before advising that code is complete, verify that existing tests still pass.
+4. All Pull Requests targeting `main` or `develop` must be submitted for review and approval by **Pashtrik Maliqi (@cooler-ctrl)**. Direct pushes to `main` are strictly blocked.
 
 ---
 
