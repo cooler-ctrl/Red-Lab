@@ -19,7 +19,7 @@ def generate_icons():
     # Ensure 512x512 master is saved cleanly
     img_512 = img.resize((512, 512), Image.Resampling.LANCZOS)
     img_512.save(master_icon_path, format="PNG")
-    print(f"✓ Verified master PNG: {master_icon_path}")
+    print(f"[OK] Verified master PNG: {master_icon_path}")
 
     # Generate Windows .ico with multi-resolutions
     ico_sizes = [(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
@@ -29,7 +29,7 @@ def generate_icons():
         format="ICO",
         sizes=ico_sizes,
     )
-    print(f"✓ Generated Windows icon: {ico_path}")
+    print(f"[OK] Generated Windows icon: {ico_path}")
 
     # Generate macOS .icns using iconutil
     iconset_dir = assets_dir / "icon.iconset"
@@ -61,7 +61,7 @@ def generate_icons():
             ["iconutil", "-c", "icns", str(iconset_dir), "-o", str(icns_path)],
             check=True,
         )
-        print(f"✓ Generated macOS ICNS bundle: {icns_path}")
+        print(f"[OK] Generated macOS ICNS bundle: {icns_path}")
     except Exception as e:
         print(f"Warning: iconutil failed ({e}), keeping existing icns if present.")
     finally:
@@ -73,7 +73,7 @@ def generate_icons():
     if frontend_public.exists():
         shutil.copy2(master_icon_path, frontend_public / "icon.png")
         shutil.copy2(ico_path, frontend_public / "favicon.ico")
-        print(f"✓ Copied icons to {frontend_public}")
+        print(f"[OK] Copied icons to {frontend_public}")
 
 if __name__ == "__main__":
     generate_icons()
