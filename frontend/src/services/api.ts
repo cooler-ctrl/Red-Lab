@@ -18,7 +18,7 @@ declare global {
   }
 }
 
-function getApiBase(): string {
+export function getApiBase(): string {
   if (typeof window !== 'undefined') {
     if (window.__REDLAB_API_URL__) return window.__REDLAB_API_URL__;
     if (window.location && window.location.origin && window.location.origin.startsWith('http')) {

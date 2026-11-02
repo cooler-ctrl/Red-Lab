@@ -13,6 +13,7 @@ import {
   ShieldAlert,
   Zap,
   Network,
+  GraduationCap,
 } from 'lucide-react';
 import { useLabStore } from '../../stores/labStore';
 import { LabCard } from './LabCard';
@@ -124,6 +125,15 @@ export function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => navigate('/academy')}
+            icon={<GraduationCap size={14} className="text-[#FF8A4C]" />}
+          >
+            Academy
+          </Button>
+
           {/* Link to Guided Training Scenarios */}
           <Button
             variant="secondary"

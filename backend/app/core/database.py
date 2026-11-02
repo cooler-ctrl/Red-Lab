@@ -30,10 +30,17 @@ def init_db() -> None:
     """Create all tables (including v1.1 LabRun) and purge legacy cloud demo records."""
     from sqlalchemy import text
     from ..models.lab import Lab, ScanResult, LabRun  # noqa: F401
+    from ..models import academy as academy_models  # noqa: F401
     Base.metadata.create_all(bind=engine)
     try:
         with engine.begin() as conn:
             conn.execute(text("DELETE FROM labs WHERE name LIKE '%Cloud%' OR description LIKE '%AWS%'"))
     except Exception:
         pass
+    from ..academy.seed import seed_academy
+    db = SessionLocal()
+    try:
+        seed_academy(db)
+    finally:
+        db.close()
 

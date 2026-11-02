@@ -5,6 +5,7 @@ from .core.config import settings
 from .core.database import init_db
 from .api.labs import router as labs_router
 from .api.runs import router as runs_router
+from .api.academy import router as academy_router
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -25,6 +26,7 @@ app.add_middleware(
 # Include routers
 app.include_router(labs_router)
 app.include_router(runs_router)
+app.include_router(academy_router)
 
 # Mount built frontend SPA if available
 if settings.FRONTEND_DIST and (settings.FRONTEND_DIST / "index.html").exists():
