@@ -1,4 +1,4 @@
-# RedLab — Visual Network Attack Simulation & Defense Platform (v1.1.1)
+# RedLab — Visual Network Attack Simulation & Defense Platform (v1.2.0)
 
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688.svg)](https://fastapi.tiangolo.com/)
@@ -8,13 +8,20 @@
 [![React Flow](https://img.shields.io/badge/@xyflow/react-12.4-FF0072.svg)](https://reactflow.dev/)
 [![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS-v4.0-38B2AC.svg)](https://tailwindcss.com/)
 
-> **RedLab (v1.1.1)** is an interactive, browser-based network attack simulation and defense education platform inspired by Cisco Packet Tracer. Users visually construct computer network topologies on a canvas, configure Layer 2/3 devices, simulate live packet flow, conduct deterministic TCP port scanning and service discovery, evaluate firewall ACL rules, inspect deep packet events, evaluate security rules that detect network attack surfaces, trace multi-hop lateral movement attack paths, and complete guided cybersecurity challenges.
+> **RedLab (v1.2.0)** is an interactive, browser-based network attack simulation and defense education platform inspired by Cisco Packet Tracer. Users visually construct computer network topologies on a canvas, configure Layer 2/3 devices, simulate live packet flow, conduct deterministic TCP port scanning and service discovery, evaluate firewall ACL rules, inspect deep packet events, evaluate security rules that detect network attack surfaces, trace multi-hop lateral movement attack paths, complete guided cybersecurity challenges, and learn through the built-in RED-Lab Academy.
 
 ---
 
-## Key Features in RedLab 1.1.1
+## Key Features in RedLab 1.2.0
 
-1. **Global Attack Mode (RED) & Defend Mode (BLUE):**
+1. **RED-Lab Academy & Certification (NEW in v1.2.0):**
+   - **Foundations Courseware:** 10 curated beginner lessons with objectives, reading modules, and live simulated exercises.
+   - **Interactive Quick Checks:** Immediate client feedback after each section with answers protected server-side.
+   - **Final Examination:** 20 randomized questions, 30-minute timer, 50% pass mark, and retry management.
+   - **Digital Certificate & Achievements:** Certificate of completion with printable layout and PDF download.
+   - **Local Video Generator:** Purely local HTML5 canvas-driven silent WebM video generator with zero external network requests.
+
+2. **Global Attack Mode (RED) & Defend Mode (BLUE):**
    - **Prominent Toolbar Mode Switch:** Seamlessly switch perspectives between Attacker and Defender without rebuilding networks.
    - **Mode-Aware Themes & Visual Identity:** Red-accented attacker aesthetic (`#FF3B4E`) vs Blue-accented defender aesthetic (`#3B82F6`) with dynamic link recoloring and node indicators.
    - **Dual-Layer Mode Enforcement:** Defense policy edits are locked in Attack Mode, and backend independently rejects prohibited operations (403 Forbidden) if mode validation fails.
@@ -82,8 +89,8 @@
 ## Desktop Software (macOS & Windows)
 
 RedLab is available as a standalone, downloadable desktop software with zero external setup required:
-- **macOS:** Downloadable `.dmg` disk image (`RedLab-1.1.1.dmg`) and `.zip` archive (`RedLab-1.1.1-mac.zip`).
-- **Windows PC:** Graphical installer (`RedLab Setup 1.1.1.exe`) and portable executable (`RedLab 1.1.1.exe`).
+- **macOS:** Downloadable `.dmg` disk image (`RedLab-1.2.0.dmg`) and `.zip` archive (`RedLab-1.2.0-mac.zip`).
+- **Windows PC:** Graphical installer (`RedLab Setup 1.2.0.exe`) and portable executable (`RedLab 1.2.0.exe`).
 
 For full download instructions and build scripts, consult the [Desktop Installation Guide](docs/DESKTOP_INSTALLATION.md).
 

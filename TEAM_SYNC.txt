@@ -1,7 +1,7 @@
 ================================================================================
-REDLAB 1.1.1 — ENGINEERING TEAM SYNC & AI AGENT ARCHITECTURAL DIRECTIVE
+REDLAB 1.2.0 — ENGINEERING TEAM SYNC & AI AGENT ARCHITECTURAL DIRECTIVE
 ================================================================================
-LAST UPDATED: 2026-10-29
+LAST UPDATED: 2026-11-03
 LEAD ARCHITECT & OWNER: Pashtrik Maliqi (@cooler-ctrl)
 TEAM ASSIGNMENTS:
   - Pashtrik Maliqi: Lead Architect & Project Lead (sole approver for main)

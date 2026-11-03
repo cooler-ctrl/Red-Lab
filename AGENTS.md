@@ -7,8 +7,8 @@
 
 ## 1. Project Mission & Identity
 
-- **Product:** RedLab (Version 1.1.1)
-- **Concept:** Visual network attack simulation and defense laboratory (like Cisco Packet Tracer, dedicated to computer network security, TCP port scanning, firewall rule filtering, traffic tracing, and attack path analysis).
+- **Product:** RedLab (Version 1.2.0)
+- **Concept:** Visual network attack simulation and defense laboratory (like Cisco Packet Tracer, dedicated to computer network security, TCP port scanning, firewall rule filtering, traffic tracing, attack path analysis, and cybersecurity academy courses).
 - **Core Loop:** Build Network Topology on Canvas → Configure Interfaces, Services & ACLs → Run Network Attack / Port Scan → Inspect Findings & Attack Paths → Remediate Misconfigurations → Rescan (Deterministic Verification).
 - **Hard Constraint:** RedLab is a **local, self-contained educational simulation**.
   - **DO NOT** introduce cloud services, AWS SDKs, or cloud-specific paradigms.
@@ -157,14 +157,15 @@ npm test         # Must pass all Vitest tests
 
 ---
 
-## 7. Current Version (1.1.1) Base Architecture & Domain Instructions
+## 7. Current Version (1.2.0) Base Architecture & Domain Instructions
 
 ### What Has Been Built (Do Not Regress):
 1. **Attack vs. Defend Studio Mode:** Prominent mode switcher in the top bar. Offense mode executes cyber attacks; Defense mode unlocks firewall ACL remediation and before/after verification.
 2. **Interactive Linux Terminal (`LinuxTerminal.tsx`):** Built-in Kali Linux bash emulator supporting `ping`, `nmap`, `hping3` (SYN flood), `hydra` (brute-force), `curl` (SQL injection), `iptables`, `netstat`, `route`, `forensics`, and `screen`.
 3. **Simulated Victim Screen (`CompromisedScreenModal.tsx`):** Visual display of the compromised host (HTTP 504 outage with live ping test, SQLi defaced website with dumped database tables, and Linux CRT tty1 root session breach).
 4. **Educational Port Forensics (`PortForensicsInspector.tsx`):** Detailed breakdown explaining why ports are Open, Closed (TCP RST by OS Kernel), or Filtered (dropped by Firewall ACL) and exact remediation steps.
-5. **Zero Cloud Services:** RedLab is completely dedicated to local network security (TCP/IP, ICMP, routing, firewalls, servers).
+5. **RED-Lab Academy:** Integrated 10-lesson Foundations course with objectives, interactive quick checks, local canvas video generator, randomized 20-question certification exams, and PDF/printable certificates.
+6. **Zero Cloud Services:** RedLab is completely dedicated to local network security (TCP/IP, ICMP, routing, firewalls, servers).
 
 ### Domain Instructions for the 5 Feature Branches:
 - **Dev 1 (`feature/canvas-*`):** Owns `EditorCanvas.tsx`, `ResourceNode.tsx`, `ResourceLibrary.tsx`. Do NOT break `onConnect` cable self-healing mechanics or delete node state in `useEditorStore`.
